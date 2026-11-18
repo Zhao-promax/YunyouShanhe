@@ -1,0 +1,17 @@
+package com.yunyou.shanhe.common.mq;
+
+/**
+ * MQ 交换机与路由键常量（跨服务共享）。
+ */
+public final class MqConstants {
+
+    private MqConstants() {
+    }
+
+    public static final String TICKET_EXCHANGE = "yunyou.ticket.topic";
+
+    public static final String ROUTING_ISSUED = "ticket.issued";
+    public static final String ROUTING_REFUND = "ticket.refund";
+    public static final String ROUTING_ORDER_CHANGED = "ticket.order.changed";
+    public static final String ROUTING_NOTIFY = "ticket.notify";
+}
