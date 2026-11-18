@@ -14,4 +14,7 @@ public final class MqConstants {
     public static final String ROUTING_REFUND = "ticket.refund";
     public static final String ROUTING_ORDER_CHANGED = "ticket.order.changed";
     public static final String ROUTING_NOTIFY = "ticket.notify";
+
+    public static final String REFUND_QUEUE = "yunyou.pay.refund.queue";
+    public static final String NOTIFY_QUEUE = "yunyou.message.notify.queue";
 }
