@@ -1,0 +1,46 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: yunyou-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: yunyou-user-service
+          uri: lb://yunyou-user-service
+          predicates:
+            - Path=/api/user/**
+        - id: yunyou-content-service
+          uri: lb://yunyou-content-service
+          predicates:
+            - Path=/api/content/**
+        - id: yunyou-ticket-service
+          uri: lb://yunyou-ticket-service
+          predicates:
+            - Path=/api/ticket/**
+        - id: yunyou-pay-service
+          uri: lb://yunyou-pay-service
+          predicates:
+            - Path=/api/pay/**
+        - id: yunyou-message-service
+          uri: lb://yunyou-message-service
+          predicates:
+            - Path=/api/message/**
+        - id: yunyou-admin-service
+          uri: lb://yunyou-admin-service
+          predicates:
+            - Path=/api/admin/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
