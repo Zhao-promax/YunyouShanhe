@@ -14,7 +14,7 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * 景点服务：CRUD + ES 索引同步 + 同片区顺路推荐。
+ * 景点服务：多维度筛选 + CRUD + ES 索引同步 + 同片区顺路推荐。
  */
 @Service
 @RequiredArgsConstructor
@@ -24,9 +24,13 @@ public class ScenicService {
     private final CityMapper cityMapper;
     private final ElasticsearchOperations elasticsearchOperations;
 
-    public List<Scenic> listByCity(Long cityId) {
+    public List<Scenic> list(Long cityId, String category, String season, Integer budgetLevel, Double minRating) {
         return scenicMapper.selectList(Wrappers.<Scenic>lambdaQuery()
                 .eq(cityId != null, Scenic::getCityId, cityId)
+                .eq(category != null && !category.isBlank(), Scenic::getCategory, category)
+                .eq(season != null && !season.isBlank(), Scenic::getBestSeason, season)
+                .eq(budgetLevel != null, Scenic::getBudgetLevel, budgetLevel)
+                .ge(minRating != null, Scenic::getRating, minRating)
                 .eq(Scenic::getStatus, 1)
                 .orderByAsc(Scenic::getSort));
     }

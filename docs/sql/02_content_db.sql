@@ -27,13 +27,21 @@ CREATE TABLE IF NOT EXISTS `scenic` (
   `lng` DECIMAL(10,6) DEFAULT NULL COMMENT '经度',
   `lat` DECIMAL(10,6) DEFAULT NULL COMMENT '纬度',
   `intro` TEXT COMMENT '景点简介',
+  `category` VARCHAR(50) DEFAULT NULL COMMENT '景点类型（自然风光/历史人文/亲子乐园/古镇村落/海岛海滨/山岳/博物馆/演出展览）',
+  `best_season` VARCHAR(20) DEFAULT NULL COMMENT '最佳游玩季节（春/夏/秋/冬/全年）',
+  `budget_level` TINYINT DEFAULT NULL COMMENT '预算档位：1免费 2低 3中 4高',
+  `suggest_days` VARCHAR(20) DEFAULT NULL COMMENT '建议游玩天数（半天/1天/2-3天/3天以上）',
+  `rating` DECIMAL(2,1) DEFAULT NULL COMMENT '评分（0-5）',
+  `tags` VARCHAR(200) DEFAULT NULL COMMENT '标签（逗号分隔）',
   `sort` INT NOT NULL DEFAULT 0 COMMENT '排序权重',
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1上架 0下架',
   `created_at` BIGINT NOT NULL COMMENT '创建时间',
   `updated_at` BIGINT NOT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`),
   KEY `idx_city_id` (`city_id`),
-  KEY `idx_name` (`name`)
+  KEY `idx_name` (`name`),
+  KEY `idx_category` (`category`),
+  KEY `idx_budget_level` (`budget_level`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='景点';
 
 -- 结构化攻略

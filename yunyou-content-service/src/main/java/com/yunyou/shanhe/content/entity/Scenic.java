@@ -26,6 +26,18 @@ public class Scenic {
 
     private String intro;
 
+    private String category;
+
+    private String bestSeason;
+
+    private Integer budgetLevel;
+
+    private String suggestDays;
+
+    private Double rating;
+
+    private String tags;
+
     private Integer sort;
 
     private Integer status;

@@ -25,8 +25,12 @@ public class ScenicController {
     private final ScenicRuleService ruleService;
 
     @GetMapping("/list")
-    public Result<List<Scenic>> list(@RequestParam(required = false) Long cityId) {
-        return Result.ok(scenicService.listByCity(cityId));
+    public Result<List<Scenic>> list(@RequestParam(required = false) Long cityId,
+                                     @RequestParam(required = false) String category,
+                                     @RequestParam(required = false) String season,
+                                     @RequestParam(required = false) Integer budgetLevel,
+                                     @RequestParam(required = false) Double minRating) {
+        return Result.ok(scenicService.list(cityId, category, season, budgetLevel, minRating));
     }
 
     @GetMapping("/{id}")

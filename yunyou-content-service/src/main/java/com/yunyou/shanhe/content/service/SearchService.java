@@ -21,10 +21,23 @@ public class SearchService {
 
     private final ElasticsearchOperations elasticsearchOperations;
 
-    public List<ScenicDocument> searchScenic(String keyword, Long cityId) {
+    public List<ScenicDocument> searchScenic(String keyword, Long cityId, String category,
+                                             String season, Integer budgetLevel, Double minRating) {
         Criteria criteria = new Criteria("name").contains(keyword);
         if (cityId != null) {
-            criteria = new Criteria("cityId").is(cityId).and("name").contains(keyword);
+            criteria = criteria.and("cityId").is(cityId);
+        }
+        if (category != null && !category.isBlank()) {
+            criteria = criteria.and("category").is(category);
+        }
+        if (season != null && !season.isBlank()) {
+            criteria = criteria.and("bestSeason").is(season);
+        }
+        if (budgetLevel != null) {
+            criteria = criteria.and("budgetLevel").is(budgetLevel);
+        }
+        if (minRating != null) {
+            criteria = criteria.and("rating").greaterThanEqual(minRating);
         }
         SearchHits<ScenicDocument> hits = elasticsearchOperations.search(
                 new CriteriaQuery(criteria), ScenicDocument.class);

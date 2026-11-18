@@ -21,8 +21,12 @@ public class SearchController {
 
     @GetMapping("/scenic")
     public Result<List<ScenicDocument>> scenic(@RequestParam String keyword,
-                                               @RequestParam(required = false) Long cityId) {
-        return Result.ok(searchService.searchScenic(keyword, cityId));
+                                               @RequestParam(required = false) Long cityId,
+                                               @RequestParam(required = false) String category,
+                                               @RequestParam(required = false) String season,
+                                               @RequestParam(required = false) Integer budgetLevel,
+                                               @RequestParam(required = false) Double minRating) {
+        return Result.ok(searchService.searchScenic(keyword, cityId, category, season, budgetLevel, minRating));
     }
 
     @GetMapping("/guide")

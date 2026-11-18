@@ -38,6 +38,24 @@ public class ScenicDocument {
     @Field(type = FieldType.Double)
     private Double lat;
 
+    @Field(type = FieldType.Keyword)
+    private String category;
+
+    @Field(type = FieldType.Keyword)
+    private String bestSeason;
+
+    @Field(type = FieldType.Integer)
+    private Integer budgetLevel;
+
+    @Field(type = FieldType.Keyword)
+    private String suggestDays;
+
+    @Field(type = FieldType.Double)
+    private Double rating;
+
+    @Field(type = FieldType.Text)
+    private String tags;
+
     public static ScenicDocument from(Scenic scenic, String cityName) {
         ScenicDocument doc = new ScenicDocument();
         doc.setId(scenic.getId());
@@ -48,6 +66,12 @@ public class ScenicDocument {
         doc.setAddress(scenic.getAddress());
         doc.setLng(scenic.getLng());
         doc.setLat(scenic.getLat());
+        doc.setCategory(scenic.getCategory());
+        doc.setBestSeason(scenic.getBestSeason());
+        doc.setBudgetLevel(scenic.getBudgetLevel());
+        doc.setSuggestDays(scenic.getSuggestDays());
+        doc.setRating(scenic.getRating());
+        doc.setTags(scenic.getTags());
         return doc;
     }
 }
