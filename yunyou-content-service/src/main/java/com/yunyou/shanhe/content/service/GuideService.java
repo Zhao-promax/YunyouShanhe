@@ -1,0 +1,47 @@
+package com.yunyou.shanhe.content.service;
+
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.yunyou.shanhe.content.entity.Guide;
+import com.yunyou.shanhe.content.es.GuideDocument;
+import com.yunyou.shanhe.content.mapper.GuideMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+/**
+ * 攻略服务：CRUD + ES 索引同步。
+ */
+@Service
+@RequiredArgsConstructor
+public class GuideService {
+
+    private final GuideMapper guideMapper;
+    private final ElasticsearchOperations elasticsearchOperations;
+
+    public List<Guide> listByScenic(Long scenicId) {
+        return guideMapper.selectList(Wrappers.<Guide>lambdaQuery()
+                .eq(scenicId != null, Guide::getScenicId, scenicId)
+                .eq(Guide::getStatus, 1)
+                .orderByDesc(Guide::getPublishTime));
+    }
+
+    public Guide getById(Long id) {
+        return guideMapper.selectById(id);
+    }
+
+    public Guide save(Guide guide) {
+        long now = System.currentTimeMillis();
+        if (guide.getId() == null) {
+            guide.setCreatedAt(now);
+            guide.setUpdatedAt(now);
+            guideMapper.insert(guide);
+        } else {
+            guide.setUpdatedAt(now);
+            guideMapper.updateById(guide);
+        }
+        elasticsearchOperations.save(GuideDocument.from(guide));
+        return guide;
+    }
+}
