@@ -30,7 +30,11 @@ public class SearchController {
     }
 
     @GetMapping("/guide")
-    public Result<List<GuideDocument>> guide(@RequestParam String keyword) {
-        return Result.ok(searchService.searchGuide(keyword));
+    public Result<List<GuideDocument>> guide(@RequestParam String keyword,
+                                             @RequestParam(required = false) Long cityId,
+                                             @RequestParam(required = false) String season,
+                                             @RequestParam(required = false) Integer budgetLevel,
+                                             @RequestParam(required = false) Integer guideType) {
+        return Result.ok(searchService.searchGuide(keyword, cityId, season, budgetLevel, guideType));
     }
 }

@@ -14,6 +14,10 @@ public class Guide {
 
     private Long scenicId;
 
+    private Long cityId;
+
+    private String scenicName;
+
     private String title;
 
     private String summary;
@@ -21,6 +25,12 @@ public class Guide {
     private String content;
 
     private Integer guideType;
+
+    private String season;
+
+    private Integer budgetLevel;
+
+    private String tags;
 
     private Integer status;
 

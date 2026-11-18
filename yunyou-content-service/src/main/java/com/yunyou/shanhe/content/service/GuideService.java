@@ -2,8 +2,10 @@ package com.yunyou.shanhe.content.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.yunyou.shanhe.content.entity.Guide;
+import com.yunyou.shanhe.content.entity.Scenic;
 import com.yunyou.shanhe.content.es.GuideDocument;
 import com.yunyou.shanhe.content.mapper.GuideMapper;
+import com.yunyou.shanhe.content.mapper.ScenicMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Service;
@@ -11,18 +13,23 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
- * 攻略服务：CRUD + ES 索引同步。
+ * 攻略服务：多维度筛选 + CRUD + ES 索引同步。
  */
 @Service
 @RequiredArgsConstructor
 public class GuideService {
 
     private final GuideMapper guideMapper;
+    private final ScenicMapper scenicMapper;
     private final ElasticsearchOperations elasticsearchOperations;
 
-    public List<Guide> listByScenic(Long scenicId) {
+    public List<Guide> list(Long scenicId, Long cityId, String season, Integer budgetLevel, Integer guideType) {
         return guideMapper.selectList(Wrappers.<Guide>lambdaQuery()
                 .eq(scenicId != null, Guide::getScenicId, scenicId)
+                .eq(cityId != null, Guide::getCityId, cityId)
+                .eq(season != null && !season.isBlank(), Guide::getSeason, season)
+                .eq(budgetLevel != null, Guide::getBudgetLevel, budgetLevel)
+                .eq(guideType != null, Guide::getGuideType, guideType)
                 .eq(Guide::getStatus, 1)
                 .orderByDesc(Guide::getPublishTime));
     }
@@ -33,6 +40,14 @@ public class GuideService {
 
     public Guide save(Guide guide) {
         long now = System.currentTimeMillis();
+        // 冗余城市与景点名，便于按城市筛选与展示
+        if (guide.getScenicId() != null) {
+            Scenic scenic = scenicMapper.selectById(guide.getScenicId());
+            if (scenic != null) {
+                guide.setCityId(scenic.getCityId());
+                guide.setScenicName(scenic.getName());
+            }
+        }
         if (guide.getId() == null) {
             guide.setCreatedAt(now);
             guide.setUpdatedAt(now);

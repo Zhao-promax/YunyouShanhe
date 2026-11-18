@@ -22,8 +22,12 @@ public class GuideController {
     private final GuideService guideService;
 
     @GetMapping("/list")
-    public Result<List<Guide>> list(@RequestParam(required = false) Long scenicId) {
-        return Result.ok(guideService.listByScenic(scenicId));
+    public Result<List<Guide>> list(@RequestParam(required = false) Long scenicId,
+                                    @RequestParam(required = false) Long cityId,
+                                    @RequestParam(required = false) String season,
+                                    @RequestParam(required = false) Integer budgetLevel,
+                                    @RequestParam(required = false) Integer guideType) {
+        return Result.ok(guideService.list(scenicId, cityId, season, budgetLevel, guideType));
     }
 
     @GetMapping("/{id}")

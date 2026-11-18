@@ -44,8 +44,21 @@ public class SearchService {
         return hits.getSearchHits().stream().map(SearchHit::getContent).toList();
     }
 
-    public List<GuideDocument> searchGuide(String keyword) {
+    public List<GuideDocument> searchGuide(String keyword, Long cityId, String season,
+                                           Integer budgetLevel, Integer guideType) {
         Criteria criteria = new Criteria("title").contains(keyword);
+        if (cityId != null) {
+            criteria = criteria.and("cityId").is(cityId);
+        }
+        if (season != null && !season.isBlank()) {
+            criteria = criteria.and("season").is(season);
+        }
+        if (budgetLevel != null) {
+            criteria = criteria.and("budgetLevel").is(budgetLevel);
+        }
+        if (guideType != null) {
+            criteria = criteria.and("guideType").is(guideType);
+        }
         SearchHits<GuideDocument> hits = elasticsearchOperations.search(
                 new CriteriaQuery(criteria), GuideDocument.class);
         return hits.getSearchHits().stream().map(SearchHit::getContent).toList();

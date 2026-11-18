@@ -52,12 +52,19 @@ CREATE TABLE IF NOT EXISTS `guide` (
   `summary` VARCHAR(500) DEFAULT NULL COMMENT '摘要',
   `content` MEDIUMTEXT COMMENT '攻略正文（结构化字段可存 JSON）',
   `guide_type` TINYINT NOT NULL DEFAULT 1 COMMENT '类型：1开放时间 2放票时间 3入园须知 4游玩路线 5避坑提示 6退票规则',
+  `city_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '所属城市ID（冗余自景点，用于按城市筛选）',
+  `scenic_name` VARCHAR(100) DEFAULT NULL COMMENT '景点名称（冗余，用于展示）',
+  `season` VARCHAR(20) DEFAULT NULL COMMENT '适合季节（春/夏/秋/冬/全年）',
+  `budget_level` TINYINT DEFAULT NULL COMMENT '预算档位：1免费 2低 3中 4高',
+  `tags` VARCHAR(200) DEFAULT NULL COMMENT '标签（逗号分隔）',
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1上架 0下架',
   `publish_time` BIGINT DEFAULT NULL COMMENT '发布时间',
   `created_at` BIGINT NOT NULL COMMENT '创建时间',
   `updated_at` BIGINT NOT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`),
   KEY `idx_scenic_id` (`scenic_id`),
+  KEY `idx_city_id` (`city_id`),
+  KEY `idx_guide_type` (`guide_type`),
   KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='结构化攻略';
 
