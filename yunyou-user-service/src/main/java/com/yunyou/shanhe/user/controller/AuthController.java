@@ -5,6 +5,7 @@ import com.yunyou.shanhe.common.core.ErrorCode;
 import com.yunyou.shanhe.common.core.Result;
 import com.yunyou.shanhe.user.dto.LoginByPasswordRequest;
 import com.yunyou.shanhe.user.dto.LoginBySmsRequest;
+import com.yunyou.shanhe.user.dto.RefreshRequest;
 import com.yunyou.shanhe.user.dto.RegisterRequest;
 import com.yunyou.shanhe.user.dto.SendSmsRequest;
 import com.yunyou.shanhe.user.dto.TokenResponse;
@@ -62,5 +63,10 @@ public class AuthController {
             throw new BizException(ErrorCode.UNAUTHORIZED);
         }
         return Result.ok(authService.getMe(authorization.substring(7)));
+    }
+
+    @PostMapping("/refresh")
+    public Result<TokenResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+        return Result.ok(authService.refresh(request.refreshToken()));
     }
 }

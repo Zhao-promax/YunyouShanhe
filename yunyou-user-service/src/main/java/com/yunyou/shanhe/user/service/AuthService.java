@@ -90,6 +90,21 @@ public class AuthService {
         // TODO 将 token 加入 Redis 黑名单直至过期，实现主动注销下线
     }
 
+    public TokenResponse refresh(String refreshToken) {
+        Long userId = jwtUtil.getUserId(refreshToken);
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BizException("用户不存在");
+        }
+        checkStatus(user);
+        return issueToken(user);
+    }
+
+    public TokenResponse wechatLogin(String code) {
+        // TODO 接入微信开放平台：code 换 openid/unionid → 绑定或创建用户 → 签发 token
+        throw new BizException("微信登录暂未接入");
+    }
+
     private void checkStatus(User user) {
         if (user.getStatus() == null || user.getStatus() != 1) {
             throw new BizException("账号已被禁用");
