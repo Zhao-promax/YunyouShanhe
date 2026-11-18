@@ -10,8 +10,8 @@ services:
       - MODE=standalone
       - NACOS_AUTH_ENABLE=false
     ports:
-      - "8848:8848"
-      - "9848:9848"
+      - "8849:8848"
+      - "9849:9848"
 
   redis:
     image: redis:7.2
