@@ -43,7 +43,7 @@ docker compose up -d
 
 | 组件 | 端口 |
 |---|---|
-| Nacos | 8849（gRPC 9849，容器内为 8848/9848） |
+| Nacos | 8848（gRPC 9848） |
 | Redis | 6379 |
 | RabbitMQ | 5672（管理台 15672，admin/admin） |
 | MySQL | 3306（root/root） |
