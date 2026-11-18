@@ -49,7 +49,7 @@ docker compose up -d
 | MySQL | 3306（root/root） |
 | Elasticsearch | 9200 |
 
-> 若 Docker 运行在虚拟机中，请将各服务 `application.yml` 里的 `127.0.0.1` 改为虚拟机 IP。
+> 各服务 `application.yml` 已配置中间件地址为虚拟机 IP `192.168.179.248`（若改用本机 Docker，改回 `127.0.0.1` 即可）。
 
 ### 构建
 
