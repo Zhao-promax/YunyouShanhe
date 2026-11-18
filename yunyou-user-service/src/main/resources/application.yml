@@ -8,6 +8,30 @@ spring:
     nacos:
       discovery:
         server-addr: 127.0.0.1:8848
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/user_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      database: 0
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# 开发期占位密钥，上线前迁移至 Nacos 配置中心 / 阿里云 KMS
+jwt:
+  secret: yunyou-shanhe-jwt-secret-dev-only-change-in-prod-0123456789
+  access-expire-seconds: 1800
+  refresh-expire-seconds: 604800
+
+aes:
+  secret: yunyou-shanhe-aes-secret-dev-only-change-in-prod-0123456789
 
 management:
   endpoints:
