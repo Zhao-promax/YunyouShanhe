@@ -13,7 +13,10 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
- * Elasticsearch 检索服务。生产环境建议接入 IK 分词器并改用 match 查询。
+ * Elasticsearch 检索服务。
+ *
+ * 说明：当前 ES 索引为动态映射（字符串字段有 .keyword 原始子字段）。
+ * 中文关键词检索使用 .keyword 做子串/精确匹配；真正的中文分词全文检索待接入 IK 分词器后改用 match 查询。
  */
 @Service
 @RequiredArgsConstructor
@@ -23,15 +26,15 @@ public class SearchService {
 
     public List<ScenicDocument> searchScenic(String keyword, Long cityId, String category,
                                              String season, Integer budgetLevel, Double minRating) {
-        Criteria criteria = new Criteria("name").contains(keyword);
+        Criteria criteria = new Criteria("name.keyword").contains(keyword);
         if (cityId != null) {
             criteria = criteria.and("cityId").is(cityId);
         }
         if (category != null && !category.isBlank()) {
-            criteria = criteria.and("category").is(category);
+            criteria = criteria.and("category.keyword").is(category);
         }
         if (season != null && !season.isBlank()) {
-            criteria = criteria.and("bestSeason").is(season);
+            criteria = criteria.and("bestSeason.keyword").is(season);
         }
         if (budgetLevel != null) {
             criteria = criteria.and("budgetLevel").is(budgetLevel);
@@ -46,12 +49,12 @@ public class SearchService {
 
     public List<GuideDocument> searchGuide(String keyword, Long cityId, String season,
                                            Integer budgetLevel, Integer guideType) {
-        Criteria criteria = new Criteria("title").contains(keyword);
+        Criteria criteria = new Criteria("title.keyword").contains(keyword);
         if (cityId != null) {
             criteria = criteria.and("cityId").is(cityId);
         }
         if (season != null && !season.isBlank()) {
-            criteria = criteria.and("season").is(season);
+            criteria = criteria.and("season.keyword").is(season);
         }
         if (budgetLevel != null) {
             criteria = criteria.and("budgetLevel").is(budgetLevel);
