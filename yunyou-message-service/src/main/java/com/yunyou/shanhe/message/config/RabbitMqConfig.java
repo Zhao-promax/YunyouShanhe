@@ -3,7 +3,9 @@ package com.yunyou.shanhe.message.config;
 import com.yunyou.shanhe.common.mq.MqConstants;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
@@ -24,12 +26,30 @@ public class RabbitMqConfig {
     }
 
     @Bean
+    public DirectExchange deadLetterExchange() {
+        return new DirectExchange(MqConstants.DEAD_LETTER_EXCHANGE, true, false);
+    }
+
+    @Bean
     public Queue notifyQueue() {
-        return new Queue(MqConstants.NOTIFY_QUEUE, true);
+        return QueueBuilder.durable(MqConstants.NOTIFY_QUEUE)
+                .deadLetterExchange(MqConstants.DEAD_LETTER_EXCHANGE)
+                .deadLetterRoutingKey(MqConstants.NOTIFY_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Queue notifyDlq() {
+        return QueueBuilder.durable(MqConstants.NOTIFY_DLQ).build();
     }
 
     @Bean
     public Binding notifyBinding(Queue notifyQueue, TopicExchange ticketExchange) {
         return BindingBuilder.bind(notifyQueue).to(ticketExchange).with(MqConstants.ROUTING_NOTIFY);
+    }
+
+    @Bean
+    public Binding notifyDlqBinding(Queue notifyDlq, DirectExchange deadLetterExchange) {
+        return BindingBuilder.bind(notifyDlq).to(deadLetterExchange).with(MqConstants.NOTIFY_DLQ);
     }
 }

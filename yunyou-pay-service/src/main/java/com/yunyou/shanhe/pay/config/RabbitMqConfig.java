@@ -3,7 +3,9 @@ package com.yunyou.shanhe.pay.config;
 import com.yunyou.shanhe.common.mq.MqConstants;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
@@ -24,12 +26,30 @@ public class RabbitMqConfig {
     }
 
     @Bean
+    public DirectExchange deadLetterExchange() {
+        return new DirectExchange(MqConstants.DEAD_LETTER_EXCHANGE, true, false);
+    }
+
+    @Bean
     public Queue refundQueue() {
-        return new Queue(MqConstants.REFUND_QUEUE, true);
+        return QueueBuilder.durable(MqConstants.REFUND_QUEUE)
+                .deadLetterExchange(MqConstants.DEAD_LETTER_EXCHANGE)
+                .deadLetterRoutingKey(MqConstants.REFUND_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Queue refundDlq() {
+        return QueueBuilder.durable(MqConstants.REFUND_DLQ).build();
     }
 
     @Bean
     public Binding refundBinding(Queue refundQueue, TopicExchange ticketExchange) {
         return BindingBuilder.bind(refundQueue).to(ticketExchange).with(MqConstants.ROUTING_REFUND);
+    }
+
+    @Bean
+    public Binding refundDlqBinding(Queue refundDlq, DirectExchange deadLetterExchange) {
+        return BindingBuilder.bind(refundDlq).to(deadLetterExchange).with(MqConstants.REFUND_DLQ);
     }
 }
