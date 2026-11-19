@@ -1,0 +1,277 @@
+# 云游山河 · K8s 部署清单（7 个服务）
+# 注意：中间件地址当前指向 VM(192.168.179.248)，部署到阿里云 ACK 前改为阿里云服务内网地址。
+
+# ==================== 网关 ====================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yunyou-gateway
+  labels: { app: yunyou-gateway }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: yunyou-gateway }
+  template:
+    metadata:
+      labels: { app: yunyou-gateway }
+    spec:
+      containers:
+        - name: yunyou-gateway
+          image: yunyou-gateway:1.0.0
+          ports: [{ containerPort: 8080 }]
+          env:
+            - { name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR, value: "192.168.179.248:8848" }
+            - { name: JWT_SECRET, value: "yunyou-shanhe-jwt-secret-dev-only-change-in-prod-0123456789" }
+          readinessProbe: { httpGet: { path: /actuator/health, port: 8080 }, initialDelaySeconds: 30, periodSeconds: 10 }
+          livenessProbe: { httpGet: { path: /actuator/health, port: 8080 }, initialDelaySeconds: 60, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yunyou-gateway
+spec:
+  type: LoadBalancer
+  selector: { app: yunyou-gateway }
+  ports: [{ port: 8080, targetPort: 8080 }]
+
+# ==================== 用户服务 ====================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yunyou-user-service
+  labels: { app: yunyou-user-service }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: yunyou-user-service }
+  template:
+    metadata:
+      labels: { app: yunyou-user-service }
+    spec:
+      containers:
+        - name: yunyou-user-service
+          image: yunyou-user-service:1.0.0
+          ports: [{ containerPort: 8081 }]
+          env:
+            - { name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR, value: "192.168.179.248:8848" }
+            - { name: SPRING_DATASOURCE_URL, value: "jdbc:mysql://192.168.179.248:3306/user_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true" }
+            - { name: SPRING_DATASOURCE_USERNAME, value: "root" }
+            - { name: SPRING_DATASOURCE_PASSWORD, value: "root" }
+            - { name: SPRING_DATA_REDIS_HOST, value: "192.168.179.248" }
+            - { name: SPRING_DATA_REDIS_PORT, value: "6379" }
+            - { name: JWT_SECRET, value: "yunyou-shanhe-jwt-secret-dev-only-change-in-prod-0123456789" }
+            - { name: AES_SECRET, value: "yunyou-shanhe-aes-secret-dev-only-change-in-prod-0123456789" }
+          readinessProbe: { httpGet: { path: /actuator/health, port: 8081 }, initialDelaySeconds: 30, periodSeconds: 10 }
+          livenessProbe: { httpGet: { path: /actuator/health, port: 8081 }, initialDelaySeconds: 60, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yunyou-user-service
+spec:
+  type: ClusterIP
+  selector: { app: yunyou-user-service }
+  ports: [{ port: 8081, targetPort: 8081 }]
+
+# ==================== 内容服务 ====================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yunyou-content-service
+  labels: { app: yunyou-content-service }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: yunyou-content-service }
+  template:
+    metadata:
+      labels: { app: yunyou-content-service }
+    spec:
+      containers:
+        - name: yunyou-content-service
+          image: yunyou-content-service:1.0.0
+          ports: [{ containerPort: 8082 }]
+          env:
+            - { name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR, value: "192.168.179.248:8848" }
+            - { name: SPRING_DATASOURCE_URL, value: "jdbc:mysql://192.168.179.248:3306/content_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true" }
+            - { name: SPRING_DATASOURCE_USERNAME, value: "root" }
+            - { name: SPRING_DATASOURCE_PASSWORD, value: "root" }
+            - { name: SPRING_ELASTICSEARCH_URIS, value: "http://192.168.179.248:9200" }
+          readinessProbe: { httpGet: { path: /actuator/health, port: 8082 }, initialDelaySeconds: 30, periodSeconds: 10 }
+          livenessProbe: { httpGet: { path: /actuator/health, port: 8082 }, initialDelaySeconds: 60, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yunyou-content-service
+spec:
+  type: ClusterIP
+  selector: { app: yunyou-content-service }
+  ports: [{ port: 8082, targetPort: 8082 }]
+
+# ==================== 票务服务 ====================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yunyou-ticket-service
+  labels: { app: yunyou-ticket-service }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: yunyou-ticket-service }
+  template:
+    metadata:
+      labels: { app: yunyou-ticket-service }
+    spec:
+      containers:
+        - name: yunyou-ticket-service
+          image: yunyou-ticket-service:1.0.0
+          ports: [{ containerPort: 8083 }]
+          env:
+            - { name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR, value: "192.168.179.248:8848" }
+            - { name: SPRING_DATASOURCE_URL, value: "jdbc:mysql://192.168.179.248:3306/ticket_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true" }
+            - { name: SPRING_DATASOURCE_USERNAME, value: "root" }
+            - { name: SPRING_DATASOURCE_PASSWORD, value: "root" }
+            - { name: SPRING_DATA_REDIS_HOST, value: "192.168.179.248" }
+            - { name: SPRING_DATA_REDIS_PORT, value: "6379" }
+            - { name: SPRING_RABBITMQ_HOST, value: "192.168.179.248" }
+            - { name: SPRING_RABBITMQ_PORT, value: "5672" }
+            - { name: SPRING_RABBITMQ_USERNAME, value: "admin" }
+            - { name: SPRING_RABBITMQ_PASSWORD, value: "admin" }
+            - { name: XXL_JOB_ADMIN_ADDRESSES, value: "http://xxl-job-admin:8080/xxl-job-admin" }
+            - { name: XXL_JOB_EXECUTOR_IP, value: "" }
+          readinessProbe: { httpGet: { path: /actuator/health, port: 8083 }, initialDelaySeconds: 30, periodSeconds: 10 }
+          livenessProbe: { httpGet: { path: /actuator/health, port: 8083 }, initialDelaySeconds: 60, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yunyou-ticket-service
+spec:
+  type: ClusterIP
+  selector: { app: yunyou-ticket-service }
+  ports: [{ port: 8083, targetPort: 8083 }]
+
+# ==================== 支付服务 ====================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yunyou-pay-service
+  labels: { app: yunyou-pay-service }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: yunyou-pay-service }
+  template:
+    metadata:
+      labels: { app: yunyou-pay-service }
+    spec:
+      containers:
+        - name: yunyou-pay-service
+          image: yunyou-pay-service:1.0.0
+          ports: [{ containerPort: 8084 }]
+          env:
+            - { name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR, value: "192.168.179.248:8848" }
+            - { name: SPRING_DATASOURCE_URL, value: "jdbc:mysql://192.168.179.248:3306/pay_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true" }
+            - { name: SPRING_DATASOURCE_USERNAME, value: "root" }
+            - { name: SPRING_DATASOURCE_PASSWORD, value: "root" }
+            - { name: SPRING_DATA_REDIS_HOST, value: "192.168.179.248" }
+            - { name: SPRING_DATA_REDIS_PORT, value: "6379" }
+            - { name: SPRING_RABBITMQ_HOST, value: "192.168.179.248" }
+            - { name: SPRING_RABBITMQ_PORT, value: "5672" }
+            - { name: SPRING_RABBITMQ_USERNAME, value: "admin" }
+            - { name: SPRING_RABBITMQ_PASSWORD, value: "admin" }
+          readinessProbe: { httpGet: { path: /actuator/health, port: 8084 }, initialDelaySeconds: 30, periodSeconds: 10 }
+          livenessProbe: { httpGet: { path: /actuator/health, port: 8084 }, initialDelaySeconds: 60, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yunyou-pay-service
+spec:
+  type: ClusterIP
+  selector: { app: yunyou-pay-service }
+  ports: [{ port: 8084, targetPort: 8084 }]
+
+# ==================== 消息服务 ====================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yunyou-message-service
+  labels: { app: yunyou-message-service }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: yunyou-message-service }
+  template:
+    metadata:
+      labels: { app: yunyou-message-service }
+    spec:
+      containers:
+        - name: yunyou-message-service
+          image: yunyou-message-service:1.0.0
+          ports: [{ containerPort: 8085 }]
+          env:
+            - { name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR, value: "192.168.179.248:8848" }
+            - { name: SPRING_DATASOURCE_URL, value: "jdbc:mysql://192.168.179.248:3306/message_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true" }
+            - { name: SPRING_DATASOURCE_USERNAME, value: "root" }
+            - { name: SPRING_DATASOURCE_PASSWORD, value: "root" }
+            - { name: SPRING_DATA_REDIS_HOST, value: "192.168.179.248" }
+            - { name: SPRING_DATA_REDIS_PORT, value: "6379" }
+            - { name: SPRING_RABBITMQ_HOST, value: "192.168.179.248" }
+            - { name: SPRING_RABBITMQ_PORT, value: "5672" }
+            - { name: SPRING_RABBITMQ_USERNAME, value: "admin" }
+            - { name: SPRING_RABBITMQ_PASSWORD, value: "admin" }
+          readinessProbe: { httpGet: { path: /actuator/health, port: 8085 }, initialDelaySeconds: 30, periodSeconds: 10 }
+          livenessProbe: { httpGet: { path: /actuator/health, port: 8085 }, initialDelaySeconds: 60, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yunyou-message-service
+spec:
+  type: ClusterIP
+  selector: { app: yunyou-message-service }
+  ports: [{ port: 8085, targetPort: 8085 }]
+
+# ==================== 运营服务 ====================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yunyou-admin-service
+  labels: { app: yunyou-admin-service }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: yunyou-admin-service }
+  template:
+    metadata:
+      labels: { app: yunyou-admin-service }
+    spec:
+      containers:
+        - name: yunyou-admin-service
+          image: yunyou-admin-service:1.0.0
+          ports: [{ containerPort: 8086 }]
+          env:
+            - { name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR, value: "192.168.179.248:8848" }
+            - { name: SPRING_DATASOURCE_URL, value: "jdbc:mysql://192.168.179.248:3306/admin_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true" }
+            - { name: SPRING_DATASOURCE_USERNAME, value: "root" }
+            - { name: SPRING_DATASOURCE_PASSWORD, value: "root" }
+          readinessProbe: { httpGet: { path: /actuator/health, port: 8086 }, initialDelaySeconds: 30, periodSeconds: 10 }
+          livenessProbe: { httpGet: { path: /actuator/health, port: 8086 }, initialDelaySeconds: 60, periodSeconds: 20 }
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yunyou-admin-service
+spec:
+  type: ClusterIP
+  selector: { app: yunyou-admin-service }
+  ports: [{ port: 8086, targetPort: 8086 }]
