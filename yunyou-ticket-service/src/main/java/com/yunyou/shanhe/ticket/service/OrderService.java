@@ -3,10 +3,13 @@ package com.yunyou.shanhe.ticket.service;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.yunyou.shanhe.ticket.entity.OrderStatusLog;
 import com.yunyou.shanhe.ticket.entity.TicketOrder;
+import com.yunyou.shanhe.ticket.enums.OrderStatus;
 import com.yunyou.shanhe.ticket.mapper.OrderStatusLogMapper;
 import com.yunyou.shanhe.ticket.mapper.TicketOrderMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * 订单服务：订单创建、查询、状态单向流转 + 状态变更日志。
@@ -25,6 +28,12 @@ public class OrderService {
     public TicketOrder getByOrderNo(String orderNo) {
         return orderMapper.selectOne(
                 Wrappers.<TicketOrder>lambdaQuery().eq(TicketOrder::getOrderNo, orderNo));
+    }
+
+    public List<TicketOrder> listExpiredPendingPay() {
+        return orderMapper.selectList(Wrappers.<TicketOrder>lambdaQuery()
+                .eq(TicketOrder::getStatus, OrderStatus.PENDING_PAY.getCode())
+                .lt(TicketOrder::getExpireTime, System.currentTimeMillis()));
     }
 
     public void updateStatus(String orderNo, Integer fromStatus, Integer toStatus, String reason, String operator) {

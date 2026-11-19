@@ -235,6 +235,55 @@ public class BookingService {
         return queuing.size();
     }
 
+    /**
+     * 批量关闭支付超时的现货订单（定时任务）。
+     */
+    public int closeExpiredOrders() {
+        List<TicketOrder> expired = orderService.listExpiredPendingPay();
+        int closed = 0;
+        for (TicketOrder order : expired) {
+            try {
+                Channel channel = channelService.getByScenicId(order.getScenicId());
+                channelService.releaseTicketWithLog(channel, order.getRequestId());
+                orderService.updateStatus(order.getOrderNo(), OrderStatus.PENDING_PAY.getCode(),
+                        OrderStatus.CLOSED.getCode(), "支付超时关闭", "system");
+                eventPublisher.publishOrderChanged(new OrderChangedEvent(order.getOrderNo(),
+                        OrderStatus.PENDING_PAY.getCode(), OrderStatus.CLOSED.getCode(), "支付超时关闭"));
+                closed++;
+            } catch (Exception e) {
+                log.error("关闭超时订单失败 orderNo={}", order.getOrderNo(), e);
+            }
+        }
+        return closed;
+    }
+
+    /**
+     * 批量熔断已到截止时间的候补单（定时任务）。
+     */
+    public int cutoffExpiredWaitlists() {
+        List<WaitlistOrder> queuing = waitlistMapper.selectList(Wrappers.<WaitlistOrder>lambdaQuery()
+                .eq(WaitlistOrder::getStatus, WaitlistStatus.QUEUING.getCode())
+                .le(WaitlistOrder::getVisitDate, LocalDate.now()));
+        int cutoff = 0;
+        for (WaitlistOrder w : queuing) {
+            try {
+                long now = System.currentTimeMillis();
+                WaitlistOrder update = new WaitlistOrder();
+                update.setId(w.getId());
+                update.setStatus(WaitlistStatus.CUTOFF_FAILED.getCode());
+                update.setUpdatedAt(now);
+                waitlistMapper.updateById(update);
+                waitlistService.remove(w.getScenicId(), w.getVisitDate(), w.getPreferredSlot(), w.getId());
+                eventPublisher.publishRefund(new RefundEvent(w.getWaitlistNo(), w.getPayOrderNo(), w.getUserId(), 0L, "候补熔断截止"));
+                eventPublisher.publishNotify(new NotifyEvent(w.getUserId(), "waitlist_failed", "候补未中签，已退款"));
+                cutoff++;
+            } catch (Exception e) {
+                log.error("候补熔断失败 waitlistNo={}", w.getWaitlistNo(), e);
+            }
+        }
+        return cutoff;
+    }
+
     private void markWon(WaitlistOrder w, String channelOrderId) {
         long now = System.currentTimeMillis();
         TicketOrder order = new TicketOrder();
