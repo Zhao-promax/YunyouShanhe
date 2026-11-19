@@ -33,3 +33,6 @@ logs/
 # 运行时产物
 nacos/
 data/
+
+# ES 插件包（大文件，不提交）
+es/*.zip

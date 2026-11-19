@@ -51,7 +51,7 @@ services:
       - ./docs/sql:/docker-entrypoint-initdb.d
 
   elasticsearch:
-    image: elasticsearch:8.13.4
+    build: ./es
     container_name: yunyou-es
     environment:
       - discovery.type=single-node
