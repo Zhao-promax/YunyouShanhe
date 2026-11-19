@@ -5,8 +5,8 @@ metadata:
   name: yunyou-middleware
 data:
   SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: "mse-xxxx-p.nacos-ans.mse.aliyuncs.com:8848"
-  # MySQL 主机/端口用于拼接各服务 datasource url
-  MYSQL_HOST: "rm-xxxx.mysql.rds.aliyuncs.com"
+  # MySQL 主机/端口用于拼接各服务 datasource url（RDS 内网地址）
+  MYSQL_HOST: "rm-bp15ivjv9krm41m7y.mysql.rds.aliyuncs.com"
   MYSQL_PORT: "3306"
   SPRING_DATA_REDIS_HOST: "r-xxxx.redis.rds.aliyuncs.com"
   SPRING_DATA_REDIS_PORT: "6379"
