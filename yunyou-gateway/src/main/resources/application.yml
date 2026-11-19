@@ -44,3 +44,7 @@ management:
     web:
       exposure:
         include: health,info,gateway
+
+# JWT 密钥需与 user-service 保持一致；上线前迁移至配置中心/KMS
+jwt:
+  secret: yunyou-shanhe-jwt-secret-dev-only-change-in-prod-0123456789
