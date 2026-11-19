@@ -1,6 +1,7 @@
 # 本地开发依赖中间件
 # 说明：若 Docker 运行在虚拟机中，请将下方服务地址改为虚拟机 IP。
 # RabbitMQ 上线前需额外启用 rabbitmq_delayed_message_exchange 插件（候补熔断延迟消息）。
+# 数据持久化：各中间件使用命名卷，docker compose down / 重启不会丢数据。
 
 services:
   nacos:
@@ -12,12 +13,17 @@ services:
     ports:
       - "8848:8848"
       - "9848:9848"
+    volumes:
+      - nacos-data:/home/nacos/data
 
   redis:
     image: redis:7.2
     container_name: yunyou-redis
+    command: redis-server --appendonly yes
     ports:
       - "6379:6379"
+    volumes:
+      - redis-data:/data
 
   rabbitmq:
     image: rabbitmq:3.13-management
@@ -28,6 +34,8 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
 
   mysql:
     image: mysql:8.0
@@ -39,6 +47,7 @@ services:
     ports:
       - "3306:3306"
     volumes:
+      - mysql-data:/var/lib/mysql
       - ./docs/sql:/docker-entrypoint-initdb.d
 
   elasticsearch:
@@ -50,3 +59,12 @@ services:
     ports:
       - "9200:9200"
       - "9300:9300"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+
+volumes:
+  nacos-data:
+  redis-data:
+  rabbitmq-data:
+  mysql-data:
+  es-data:
