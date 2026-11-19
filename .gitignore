@@ -36,3 +36,6 @@ data/
 
 # ES 插件包（大文件，不提交）
 es/*.zip
+
+# K8s 真实密钥（不提交）
+deploy/k8s/secret.yaml
