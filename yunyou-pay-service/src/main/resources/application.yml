@@ -18,6 +18,11 @@ spring:
     port: 5672
     username: admin
     password: admin
+  data:
+    redis:
+      host: 192.168.179.248
+      port: 6379
+      database: 0
 
 mybatis-plus:
   configuration:
