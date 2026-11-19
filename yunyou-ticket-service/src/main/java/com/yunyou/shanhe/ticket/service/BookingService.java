@@ -38,6 +38,7 @@ public class BookingService {
     private final WaitlistService waitlistService;
     private final WaitlistOrderMapper waitlistMapper;
     private final EventPublisher eventPublisher;
+    private final TicketTypeService ticketTypeService;
 
     /**
      * 现货下单：先锁后付（景区锁票 → 生成待支付订单）。
@@ -63,7 +64,8 @@ public class BookingService {
         order.setTimeSlot(request.timeSlot());
         order.setTicketType(request.ticketType());
         order.setQuantity(request.quantity());
-        order.setAmount(0L); // TODO 从票种价格配置计算
+        Long unitPrice = ticketTypeService.getPrice(request.scenicId(), request.ticketType());
+        order.setAmount(unitPrice * request.quantity());
         order.setStatus(OrderStatus.PENDING_PAY.getCode());
         order.setChannelId(channel.getId());
         order.setRequestId(requestId);

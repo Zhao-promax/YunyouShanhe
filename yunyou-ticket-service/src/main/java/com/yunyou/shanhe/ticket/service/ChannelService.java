@@ -7,6 +7,10 @@ import com.yunyou.shanhe.ticket.channel.ChannelLockResult;
 import com.yunyou.shanhe.ticket.channel.ScenicChannelClient;
 import com.yunyou.shanhe.ticket.entity.Channel;
 import com.yunyou.shanhe.ticket.mapper.ChannelMapper;
+import com.alibaba.csp.sentinel.Entry;
+import com.alibaba.csp.sentinel.SphU;
+import com.alibaba.csp.sentinel.slots.block.BlockException;
+import com.yunyou.shanhe.ticket.config.SentinelConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -41,13 +45,23 @@ public class ChannelService {
      * 锁票并留存交互报文。
      */
     public ChannelLockResult lockTicketWithLog(Channel channel, ChannelLockRequest request) {
-        long start = System.currentTimeMillis();
-        ChannelLockResult result = scenicChannelClient.lockTicket(request);
-        interactionLogService.record(channel.getId(), request.requestId(), 1, "lockTicket", "POST",
-                request.toString(), null, null, null);
-        interactionLogService.record(channel.getId(), request.requestId(), 2, "lockTicket", "POST",
-                null, result.toString(), null, (int) (System.currentTimeMillis() - start));
-        return result;
+        Entry entry = null;
+        try {
+            entry = SphU.entry(SentinelConfig.resourceName(channel.getId()));
+            long start = System.currentTimeMillis();
+            ChannelLockResult result = scenicChannelClient.lockTicket(request);
+            interactionLogService.record(channel.getId(), request.requestId(), 1, "lockTicket", "POST",
+                    request.toString(), null, null, null);
+            interactionLogService.record(channel.getId(), request.requestId(), 2, "lockTicket", "POST",
+                    null, result.toString(), null, (int) (System.currentTimeMillis() - start));
+            return result;
+        } catch (BlockException e) {
+            throw new BizException("渠道繁忙，请稍后再试");
+        } finally {
+            if (entry != null) {
+                entry.exit();
+            }
+        }
     }
 
     /**

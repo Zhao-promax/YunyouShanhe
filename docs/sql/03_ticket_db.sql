@@ -99,3 +99,17 @@ CREATE TABLE IF NOT EXISTS `channel_interaction_log` (
   KEY `idx_request_id` (`request_id`),
   KEY `idx_channel_id` (`channel_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='渠道交互报文留存';
+
+-- 票种价格（景区提供、平台透传，不加价；固定价可修改，未来活动价可扩展）
+CREATE TABLE IF NOT EXISTS `ticket_type` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `scenic_id` BIGINT UNSIGNED NOT NULL COMMENT '景区ID',
+  `type_code` VARCHAR(20) NOT NULL COMMENT '票种编码（adult/child/student/senior）',
+  `type_name` VARCHAR(50) NOT NULL COMMENT '票种名称',
+  `price` BIGINT NOT NULL COMMENT '票价（分）',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1启用 0停用',
+  `created_at` BIGINT NOT NULL COMMENT '创建时间',
+  `updated_at` BIGINT NOT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_scenic_type` (`scenic_id`, `type_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='票种价格';
