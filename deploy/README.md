@@ -1,57 +1,68 @@
-# 部署说明（阿里云 ACK / Kubernetes）
+# 部署说明（阿里云 ACK + 托管中间件）
 
-## 1. 构建镜像
+按架构定稿：**ACK（K8s）部署业务服务；Nacos/MySQL/Redis/ES 用阿里云托管（同一 VPC 内网）；RabbitMQ 自建（K8s StatefulSet）**。
 
-先本地构建所有服务 jar（用 JDK 17）：
+## 一、阿里云资源准备（需要你在控制台创建，并拿到内网地址）
+
+| 资源 | 说明 | 需要给我的信息 |
+|---|---|---|
+| VPC + 交换机 | 所有资源同一 VPC | 无需 |
+| ACK 集群 | 托管版，2-3 可用区 | 无需 |
+| MSE Nacos | 3 节点高可用 | 内网地址（`mse-xxx-p.nacos-ans.mse.aliyuncs.com:8848`） |
+| RDS MySQL | 高可用版，建 6 个库 | 内网地址（`rm-xxx.mysql.rds.aliyuncs.com`） |
+| Redis（Tair） | 企业版 | 内网地址（`r-xxx.redis.rds.aliyuncs.com`） |
+| Elasticsearch | 托管，3 节点 | 内网地址 |
+| OSS / 短信 / SLS | 对象存储/短信/日志 | 按需 |
+
+> ⚠️ **RDS 不要开公网**，不要用 `0.0.0.0/0` 白名单；应用和 RDS 同 VPC 走内网，白名单放 VPC 网段。
+
+## 二、初始化数据库
+
+RDS 建好 6 个库后，执行 `docs/sql/` 下的建表脚本：
+
+```bash
+# 以 mysql 客户端为例（走内网）
+mysql -h <RDS内网地址> -u <账号> -p < docs/sql/01_user_db.sql
+# ... 依次执行 01~07
+```
+
+## 三、构建镜像
+
+本地构建 jar + 镜像（以 user-service 为例）：
 
 ```bash
 JAVA_HOME="C:/Program Files/Java/jdk-17" ./mvnw clean package -Dmaven.test.skip=true
-```
-
-再逐个构建镜像（以 user-service 为例，其余同理）：
-
-```bash
 docker build -f deploy/Dockerfile \
   --build-arg JAR_FILE=yunyou-user-service/target/yunyou-user-service-1.0.0-SNAPSHOT.jar \
   -t yunyou-user-service:1.0.0 .
 ```
 
-7 个服务对应关系：
+推到阿里云容器镜像服务 ACR，其余 6 个服务同理。
 
-| 服务 | JAR_FILE | 镜像 tag | 端口 |
-|---|---|---|---|
-| gateway | yunyou-gateway/target/yunyou-gateway-...jar | yunyou-gateway:1.0.0 | 8080 |
-| user | yunyou-user-service/...jar | yunyou-user-service:1.0.0 | 8081 |
-| content | yunyou-content-service/...jar | yunyou-content-service:1.0.0 | 8082 |
-| ticket | yunyou-ticket-service/...jar | yunyou-ticket-service:1.0.0 | 8083 |
-| pay | yunyou-pay-service/...jar | yunyou-pay-service:1.0.0 | 8084 |
-| message | yunyou-message-service/...jar | yunyou-message-service:1.0.0 | 8085 |
-| admin | yunyou-admin-service/...jar | yunyou-admin-service:1.0.0 | 8086 |
-
-## 2. 修改中间件地址
-
-`deploy/k8s/deployments.yaml` 里中间件地址是**占位符**（Nacos/MySQL/Redis/RabbitMQ/ES 都指向 `192.168.179.248`，即当前 VM）。
-
-部署到 ACK 时，需要改成阿里云服务地址：
-- Nacos → 阿里云 MSE Nacos 地址
-- MySQL → 阿里云 RDS 内网地址（各服务 `user_db`/`content_db`/... 库）
-- Redis → 阿里云 Redis 内网地址
-- RabbitMQ → 自建或阿里云 AMQP 内网地址
-- ES → 阿里云 ES 内网地址
-
-## 3. 部署
+## 四、部署
 
 ```bash
+# 1. 填好中间件地址（内网）和密钥
+#    deploy/k8s/configmap.yaml   —— 非敏感中间件地址
+#    deploy/k8s/secret.yaml      —— 数据库/密钥/口令（CHANGE_ME 替换为真实值）
+# 2. 依次 apply
+kubectl apply -f deploy/k8s/configmap.yaml
+kubectl apply -f deploy/k8s/secret.yaml
+kubectl apply -f deploy/k8s/rabbitmq.yaml
 kubectl apply -f deploy/k8s/deployments.yaml
-kubectl get pods -w   # 等待所有 Pod Running
+
+kubectl get pods -w   # 等所有 Pod Running
 ```
 
-## 4. 对外暴露
+## 五、对外暴露
 
-网关 `Service` 类型为 `LoadBalancer`（阿里云会分配 SLB 公网/内网地址），其余服务为 `ClusterIP`（只集群内部通过 Nacos 发现访问）。
+- 网关 `Service` 类型 `LoadBalancer`（阿里云分配 SLB 地址）
+- 域名解析到该 SLB，SLB 前挂 WAF + CDN，HTTPS 证书在 SLB/WAF 终结
 
-## 5. 生产注意事项
+## 六、生产注意事项
 
-- 密钥（jwt.secret/aes.secret/渠道密钥）通过 K8s Secret 或阿里云 KMS 注入，不要硬编码
-- MySQL/RabbitMQ 生产口令不要用 dev 默认值（root/root、admin/admin）
-- 建议为每个服务配置 HPA（自动扩缩容）、liveness/readiness 探针、资源 limits
+- **密钥**：`secret.yaml` 里的 `CHANGE_ME` 换成强口令/随机密钥；正式环境建议用阿里云 KMS 或加密 Secret
+- **RabbitMQ 延迟插件**：`rabbitmq.yaml` 用的是标准镜像，候补熔断的延迟消息需要启用 `rabbitmq_delayed_message_exchange` 插件（自建镜像加入该插件）
+- **数据库口令**：不要用 root/root 之类默认值
+- **HPA/灰度**：按需给核心服务（ticket/user）配 HPA；灰度用 ACK 的 canary 或网关按 header/权重路由
+- **监控**：接 ARMS + Prometheus/Grafana + SLS，对账差异、MQ 堆积、429 次数等核心指标告警

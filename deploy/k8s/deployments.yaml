@@ -1,5 +1,6 @@
-# 云游山河 · K8s 部署清单（7 个服务）
-# 注意：中间件地址当前指向 VM(192.168.179.248)，部署到阿里云 ACK 前改为阿里云服务内网地址。
+# 云游山河 · 7 个服务 Deployment + Service
+# 依赖：先 apply configmap.yaml / secret.yaml / rabbitmq.yaml
+# 中间件地址在 configmap.yaml 中配置（内网地址）
 
 # ==================== 网关 ====================
 apiVersion: apps/v1
@@ -19,9 +20,11 @@ spec:
         - name: yunyou-gateway
           image: yunyou-gateway:1.0.0
           ports: [{ containerPort: 8080 }]
+          envFrom:
+            - configMapRef: { name: yunyou-middleware }
           env:
-            - { name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR, value: "192.168.179.248:8848" }
-            - { name: JWT_SECRET, value: "yunyou-shanhe-jwt-secret-dev-only-change-in-prod-0123456789" }
+            - name: JWT_SECRET
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: JWT_SECRET } }
           readinessProbe: { httpGet: { path: /actuator/health, port: 8080 }, initialDelaySeconds: 30, periodSeconds: 10 }
           livenessProbe: { httpGet: { path: /actuator/health, port: 8080 }, initialDelaySeconds: 60, periodSeconds: 20 }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
@@ -53,15 +56,19 @@ spec:
         - name: yunyou-user-service
           image: yunyou-user-service:1.0.0
           ports: [{ containerPort: 8081 }]
+          envFrom:
+            - configMapRef: { name: yunyou-middleware }
           env:
-            - { name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR, value: "192.168.179.248:8848" }
-            - { name: SPRING_DATASOURCE_URL, value: "jdbc:mysql://192.168.179.248:3306/user_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true" }
-            - { name: SPRING_DATASOURCE_USERNAME, value: "root" }
-            - { name: SPRING_DATASOURCE_PASSWORD, value: "root" }
-            - { name: SPRING_DATA_REDIS_HOST, value: "192.168.179.248" }
-            - { name: SPRING_DATA_REDIS_PORT, value: "6379" }
-            - { name: JWT_SECRET, value: "yunyou-shanhe-jwt-secret-dev-only-change-in-prod-0123456789" }
-            - { name: AES_SECRET, value: "yunyou-shanhe-aes-secret-dev-only-change-in-prod-0123456789" }
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://$(MYSQL_HOST):$(MYSQL_PORT)/user_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: DB_USERNAME } }
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: DB_PASSWORD } }
+            - name: JWT_SECRET
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: JWT_SECRET } }
+            - name: AES_SECRET
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: AES_SECRET } }
           readinessProbe: { httpGet: { path: /actuator/health, port: 8081 }, initialDelaySeconds: 30, periodSeconds: 10 }
           livenessProbe: { httpGet: { path: /actuator/health, port: 8081 }, initialDelaySeconds: 60, periodSeconds: 20 }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
@@ -93,12 +100,15 @@ spec:
         - name: yunyou-content-service
           image: yunyou-content-service:1.0.0
           ports: [{ containerPort: 8082 }]
+          envFrom:
+            - configMapRef: { name: yunyou-middleware }
           env:
-            - { name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR, value: "192.168.179.248:8848" }
-            - { name: SPRING_DATASOURCE_URL, value: "jdbc:mysql://192.168.179.248:3306/content_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true" }
-            - { name: SPRING_DATASOURCE_USERNAME, value: "root" }
-            - { name: SPRING_DATASOURCE_PASSWORD, value: "root" }
-            - { name: SPRING_ELASTICSEARCH_URIS, value: "http://192.168.179.248:9200" }
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://$(MYSQL_HOST):$(MYSQL_PORT)/content_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: DB_USERNAME } }
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: DB_PASSWORD } }
           readinessProbe: { httpGet: { path: /actuator/health, port: 8082 }, initialDelaySeconds: 30, periodSeconds: 10 }
           livenessProbe: { httpGet: { path: /actuator/health, port: 8082 }, initialDelaySeconds: 60, periodSeconds: 20 }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
@@ -130,19 +140,19 @@ spec:
         - name: yunyou-ticket-service
           image: yunyou-ticket-service:1.0.0
           ports: [{ containerPort: 8083 }]
+          envFrom:
+            - configMapRef: { name: yunyou-middleware }
           env:
-            - { name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR, value: "192.168.179.248:8848" }
-            - { name: SPRING_DATASOURCE_URL, value: "jdbc:mysql://192.168.179.248:3306/ticket_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true" }
-            - { name: SPRING_DATASOURCE_USERNAME, value: "root" }
-            - { name: SPRING_DATASOURCE_PASSWORD, value: "root" }
-            - { name: SPRING_DATA_REDIS_HOST, value: "192.168.179.248" }
-            - { name: SPRING_DATA_REDIS_PORT, value: "6379" }
-            - { name: SPRING_RABBITMQ_HOST, value: "192.168.179.248" }
-            - { name: SPRING_RABBITMQ_PORT, value: "5672" }
-            - { name: SPRING_RABBITMQ_USERNAME, value: "admin" }
-            - { name: SPRING_RABBITMQ_PASSWORD, value: "admin" }
-            - { name: XXL_JOB_ADMIN_ADDRESSES, value: "http://xxl-job-admin:8080/xxl-job-admin" }
-            - { name: XXL_JOB_EXECUTOR_IP, value: "" }
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://$(MYSQL_HOST):$(MYSQL_PORT)/ticket_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: DB_USERNAME } }
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: DB_PASSWORD } }
+            - name: SPRING_RABBITMQ_USERNAME
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: RABBITMQ_USERNAME } }
+            - name: SPRING_RABBITMQ_PASSWORD
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: RABBITMQ_PASSWORD } }
           readinessProbe: { httpGet: { path: /actuator/health, port: 8083 }, initialDelaySeconds: 30, periodSeconds: 10 }
           livenessProbe: { httpGet: { path: /actuator/health, port: 8083 }, initialDelaySeconds: 60, periodSeconds: 20 }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
@@ -174,17 +184,19 @@ spec:
         - name: yunyou-pay-service
           image: yunyou-pay-service:1.0.0
           ports: [{ containerPort: 8084 }]
+          envFrom:
+            - configMapRef: { name: yunyou-middleware }
           env:
-            - { name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR, value: "192.168.179.248:8848" }
-            - { name: SPRING_DATASOURCE_URL, value: "jdbc:mysql://192.168.179.248:3306/pay_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true" }
-            - { name: SPRING_DATASOURCE_USERNAME, value: "root" }
-            - { name: SPRING_DATASOURCE_PASSWORD, value: "root" }
-            - { name: SPRING_DATA_REDIS_HOST, value: "192.168.179.248" }
-            - { name: SPRING_DATA_REDIS_PORT, value: "6379" }
-            - { name: SPRING_RABBITMQ_HOST, value: "192.168.179.248" }
-            - { name: SPRING_RABBITMQ_PORT, value: "5672" }
-            - { name: SPRING_RABBITMQ_USERNAME, value: "admin" }
-            - { name: SPRING_RABBITMQ_PASSWORD, value: "admin" }
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://$(MYSQL_HOST):$(MYSQL_PORT)/pay_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: DB_USERNAME } }
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: DB_PASSWORD } }
+            - name: SPRING_RABBITMQ_USERNAME
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: RABBITMQ_USERNAME } }
+            - name: SPRING_RABBITMQ_PASSWORD
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: RABBITMQ_PASSWORD } }
           readinessProbe: { httpGet: { path: /actuator/health, port: 8084 }, initialDelaySeconds: 30, periodSeconds: 10 }
           livenessProbe: { httpGet: { path: /actuator/health, port: 8084 }, initialDelaySeconds: 60, periodSeconds: 20 }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
@@ -216,17 +228,19 @@ spec:
         - name: yunyou-message-service
           image: yunyou-message-service:1.0.0
           ports: [{ containerPort: 8085 }]
+          envFrom:
+            - configMapRef: { name: yunyou-middleware }
           env:
-            - { name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR, value: "192.168.179.248:8848" }
-            - { name: SPRING_DATASOURCE_URL, value: "jdbc:mysql://192.168.179.248:3306/message_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true" }
-            - { name: SPRING_DATASOURCE_USERNAME, value: "root" }
-            - { name: SPRING_DATASOURCE_PASSWORD, value: "root" }
-            - { name: SPRING_DATA_REDIS_HOST, value: "192.168.179.248" }
-            - { name: SPRING_DATA_REDIS_PORT, value: "6379" }
-            - { name: SPRING_RABBITMQ_HOST, value: "192.168.179.248" }
-            - { name: SPRING_RABBITMQ_PORT, value: "5672" }
-            - { name: SPRING_RABBITMQ_USERNAME, value: "admin" }
-            - { name: SPRING_RABBITMQ_PASSWORD, value: "admin" }
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://$(MYSQL_HOST):$(MYSQL_PORT)/message_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: DB_USERNAME } }
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: DB_PASSWORD } }
+            - name: SPRING_RABBITMQ_USERNAME
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: RABBITMQ_USERNAME } }
+            - name: SPRING_RABBITMQ_PASSWORD
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: RABBITMQ_PASSWORD } }
           readinessProbe: { httpGet: { path: /actuator/health, port: 8085 }, initialDelaySeconds: 30, periodSeconds: 10 }
           livenessProbe: { httpGet: { path: /actuator/health, port: 8085 }, initialDelaySeconds: 60, periodSeconds: 20 }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
@@ -258,11 +272,15 @@ spec:
         - name: yunyou-admin-service
           image: yunyou-admin-service:1.0.0
           ports: [{ containerPort: 8086 }]
+          envFrom:
+            - configMapRef: { name: yunyou-middleware }
           env:
-            - { name: SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR, value: "192.168.179.248:8848" }
-            - { name: SPRING_DATASOURCE_URL, value: "jdbc:mysql://192.168.179.248:3306/admin_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true" }
-            - { name: SPRING_DATASOURCE_USERNAME, value: "root" }
-            - { name: SPRING_DATASOURCE_PASSWORD, value: "root" }
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://$(MYSQL_HOST):$(MYSQL_PORT)/admin_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: DB_USERNAME } }
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: DB_PASSWORD } }
           readinessProbe: { httpGet: { path: /actuator/health, port: 8086 }, initialDelaySeconds: 30, periodSeconds: 10 }
           livenessProbe: { httpGet: { path: /actuator/health, port: 8086 }, initialDelaySeconds: 60, periodSeconds: 20 }
           resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }

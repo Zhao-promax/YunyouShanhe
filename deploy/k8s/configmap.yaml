@@ -1,0 +1,16 @@
+# 非敏感中间件地址（部署前替换为阿里云各服务的「内网地址」）
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yunyou-middleware
+data:
+  SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: "mse-xxxx-p.nacos-ans.mse.aliyuncs.com:8848"
+  # MySQL 主机/端口用于拼接各服务 datasource url
+  MYSQL_HOST: "rm-xxxx.mysql.rds.aliyuncs.com"
+  MYSQL_PORT: "3306"
+  SPRING_DATA_REDIS_HOST: "r-xxxx.redis.rds.aliyuncs.com"
+  SPRING_DATA_REDIS_PORT: "6379"
+  SPRING_RABBITMQ_HOST: "yunyou-rabbitmq"
+  SPRING_RABBITMQ_PORT: "5672"
+  SPRING_ELASTICSEARCH_URIS: "http://es-xxxx.public.elasticsearch.aliyuncs.com:9200"
+  XXL_JOB_ADMIN_ADDRESSES: "http://xxl-job-admin:8080/xxl-job-admin"

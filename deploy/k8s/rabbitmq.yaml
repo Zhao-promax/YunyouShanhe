@@ -1,0 +1,49 @@
+# RabbitMQ 自建（架构定为自建，不走托管）
+# 注意：上线前需在镜像内启用 rabbitmq_delayed_message_exchange 插件（候补熔断延迟消息）
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: yunyou-rabbitmq
+  labels: { app: yunyou-rabbitmq }
+spec:
+  serviceName: yunyou-rabbitmq
+  replicas: 1
+  selector:
+    matchLabels: { app: yunyou-rabbitmq }
+  template:
+    metadata:
+      labels: { app: yunyou-rabbitmq }
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3.13-management
+          ports:
+            - { name: amqp, containerPort: 5672 }
+            - { name: management, containerPort: 15672 }
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: RABBITMQ_USERNAME } }
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom: { secretKeyRef: { name: yunyou-secrets, key: RABBITMQ_PASSWORD } }
+          volumeMounts:
+            - { name: rabbitmq-data, mountPath: /var/lib/rabbitmq }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: 1000m, memory: 1Gi }
+  volumeClaimTemplates:
+    - metadata: { name: rabbitmq-data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests: { storage: 10Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yunyou-rabbitmq
+spec:
+  type: ClusterIP
+  selector: { app: yunyou-rabbitmq }
+  ports:
+    - { name: amqp, port: 5672, targetPort: 5672 }
+    - { name: management, port: 15672, targetPort: 15672 }
