@@ -148,6 +148,16 @@ java -jar yunyou-user-service/target/yunyou-user-service-1.0.0-SNAPSHOT.jar
 - 本机若同时存在 JDK 8/11/17，构建和运行务必使用 **JDK 17**（`JAVA_HOME` 或运行命令显式指定）。
 - 开发期密钥（JWT/AES）在各服务 `application.yml` 里为占位值，上线前迁移到 Nacos 配置中心 / 阿里云 KMS。
 
-## 已知 TODO
+## 已完成的核心能力
 
-见 [架构设计.md](架构设计.md) 的「风险与前置确认项」，以及代码中 `TODO` 注释：网关 JWT 鉴权、微信登录/短信/推送真实现、Webhook 验签、Sentinel 限流、三方对账、票种价格、队列补偿与 XXL-Job、MQ 手动 ACK/死信/幂等。
+- 网关 JWT 鉴权、消费幂等、MQ 手动 ACK + 死信队列、Sentinel 渠道 QPS 限流
+- 票种价格配置、候补队列 Redis↔DB 对账补偿、XXL-Job 定时任务（对账/熔断/超时关闭）
+- ES 中文检索 IK 分词器、攻略/景点多维度筛选
+- 实名档案自动归档、单元测试、Dockerfile 与 K8s 部署清单
+
+## 剩余 TODO（外部依赖 / 商务环节）
+
+- 微信登录、阿里云短信、极光推送（需外部账号资质）
+- Webhook 验签（需景区签名规范 / 密钥）
+- 三方对账（需真实景区订单数据）
+- 密钥上收 Nacos 配置中心 / KMS（部署时以环境变量 / K8s Secret 注入）
