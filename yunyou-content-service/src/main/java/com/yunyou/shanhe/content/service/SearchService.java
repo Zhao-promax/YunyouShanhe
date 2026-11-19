@@ -6,17 +6,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
-import org.springframework.data.elasticsearch.core.query.Criteria;
-import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
+import org.springframework.data.elasticsearch.core.query.StringQuery;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Elasticsearch 检索服务。
- *
- * 说明：当前 ES 索引为动态映射（字符串字段有 .keyword 原始子字段）。
- * 中文关键词检索使用 .keyword 做子串/精确匹配；真正的中文分词全文检索待接入 IK 分词器后改用 match 查询。
+ * Elasticsearch 检索服务。中文检索使用 IK 分词 + match 查询。
  */
 @Service
 @RequiredArgsConstructor
@@ -26,44 +23,57 @@ public class SearchService {
 
     public List<ScenicDocument> searchScenic(String keyword, Long cityId, String category,
                                              String season, Integer budgetLevel, Double minRating) {
-        Criteria criteria = new Criteria("name.keyword").contains(keyword);
+        List<String> filters = new ArrayList<>();
         if (cityId != null) {
-            criteria = criteria.and("cityId").is(cityId);
+            filters.add("{\"term\":{\"cityId\":" + cityId + "}}");
         }
         if (category != null && !category.isBlank()) {
-            criteria = criteria.and("category.keyword").is(category);
+            filters.add("{\"term\":{\"category\":\"" + escape(category) + "\"}}");
         }
         if (season != null && !season.isBlank()) {
-            criteria = criteria.and("bestSeason.keyword").is(season);
+            filters.add("{\"term\":{\"bestSeason\":\"" + escape(season) + "\"}}");
         }
         if (budgetLevel != null) {
-            criteria = criteria.and("budgetLevel").is(budgetLevel);
+            filters.add("{\"term\":{\"budgetLevel\":" + budgetLevel + "}}");
         }
         if (minRating != null) {
-            criteria = criteria.and("rating").greaterThanEqual(minRating);
+            filters.add("{\"range\":{\"rating\":{\"gte\":" + minRating + "}}}");
         }
+        String json = "{\"bool\":{\"must\":[{\"match\":{\"name\":\"" + escape(keyword) + "\"}}]"
+                + (filters.isEmpty() ? "" : ",\"filter\":[" + String.join(",", filters) + "]")
+                + "}}";
         SearchHits<ScenicDocument> hits = elasticsearchOperations.search(
-                new CriteriaQuery(criteria), ScenicDocument.class);
+                new StringQuery(json), ScenicDocument.class);
         return hits.getSearchHits().stream().map(SearchHit::getContent).toList();
     }
 
     public List<GuideDocument> searchGuide(String keyword, Long cityId, String season,
                                            Integer budgetLevel, Integer guideType) {
-        Criteria criteria = new Criteria("title.keyword").contains(keyword);
+        List<String> filters = new ArrayList<>();
         if (cityId != null) {
-            criteria = criteria.and("cityId").is(cityId);
+            filters.add("{\"term\":{\"cityId\":" + cityId + "}}");
         }
         if (season != null && !season.isBlank()) {
-            criteria = criteria.and("season.keyword").is(season);
+            filters.add("{\"term\":{\"season\":\"" + escape(season) + "\"}}");
         }
         if (budgetLevel != null) {
-            criteria = criteria.and("budgetLevel").is(budgetLevel);
+            filters.add("{\"term\":{\"budgetLevel\":" + budgetLevel + "}}");
         }
         if (guideType != null) {
-            criteria = criteria.and("guideType").is(guideType);
+            filters.add("{\"term\":{\"guideType\":" + guideType + "}}");
         }
+        String json = "{\"bool\":{\"must\":[{\"match\":{\"title\":\"" + escape(keyword) + "\"}}]"
+                + (filters.isEmpty() ? "" : ",\"filter\":[" + String.join(",", filters) + "]")
+                + "}}";
         SearchHits<GuideDocument> hits = elasticsearchOperations.search(
-                new CriteriaQuery(criteria), GuideDocument.class);
+                new StringQuery(json), GuideDocument.class);
         return hits.getSearchHits().stream().map(SearchHit::getContent).toList();
+    }
+
+    private String escape(String s) {
+        if (s == null) {
+            return "";
+        }
+        return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

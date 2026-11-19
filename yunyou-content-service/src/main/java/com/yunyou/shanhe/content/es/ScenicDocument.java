@@ -8,7 +8,7 @@ import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 
 /**
- * 景点搜索索引文档。
+ * 景点搜索索引文档（中文检索使用 IK 分词器）。
  */
 @Data
 @Document(indexName = "scenic")
@@ -23,10 +23,10 @@ public class ScenicDocument {
     @Field(type = FieldType.Keyword)
     private String cityName;
 
-    @Field(type = FieldType.Text)
+    @Field(type = FieldType.Text, analyzer = "ik_max_word", searchAnalyzer = "ik_smart")
     private String name;
 
-    @Field(type = FieldType.Text)
+    @Field(type = FieldType.Text, analyzer = "ik_max_word", searchAnalyzer = "ik_smart")
     private String intro;
 
     @Field(type = FieldType.Keyword)
@@ -53,7 +53,7 @@ public class ScenicDocument {
     @Field(type = FieldType.Double)
     private Double rating;
 
-    @Field(type = FieldType.Text)
+    @Field(type = FieldType.Text, analyzer = "ik_max_word", searchAnalyzer = "ik_smart")
     private String tags;
 
     public static ScenicDocument from(Scenic scenic, String cityName) {
