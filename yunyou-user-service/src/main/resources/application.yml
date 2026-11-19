@@ -33,6 +33,10 @@ jwt:
 aes:
   secret: yunyou-shanhe-aes-secret-dev-only-change-in-prod-0123456789
 
+# 实名档案归档保留天数（超期未使用则软删除归档）
+realname:
+  archive-days: 90
+
 management:
   endpoints:
     web:

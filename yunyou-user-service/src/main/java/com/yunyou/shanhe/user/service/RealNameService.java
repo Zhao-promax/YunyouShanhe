@@ -50,6 +50,26 @@ public class RealNameService {
         mapper.deleteById(id);
     }
 
+    /**
+     * 归档超期未使用的实名档案（软删除）。合规要求：游玩核销+退票窗口期后按协议归档。
+     */
+    public int archiveExpired(int days) {
+        long threshold = System.currentTimeMillis() - days * 24L * 3600 * 1000;
+        List<RealNameProfile> expired = mapper.selectList(Wrappers.<RealNameProfile>lambdaQuery()
+                .eq(RealNameProfile::getStatus, 1)
+                .le(RealNameProfile::getUpdatedAt, threshold));
+        int archived = 0;
+        for (RealNameProfile p : expired) {
+            RealNameProfile update = new RealNameProfile();
+            update.setId(p.getId());
+            update.setStatus(0);
+            update.setArchivedAt(System.currentTimeMillis());
+            mapper.updateById(update);
+            archived++;
+        }
+        return archived;
+    }
+
     private String mask(String idCardNo) {
         if (idCardNo == null || idCardNo.length() < 8) {
             return idCardNo;

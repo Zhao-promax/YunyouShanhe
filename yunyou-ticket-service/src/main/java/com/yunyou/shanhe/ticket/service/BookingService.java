@@ -19,9 +19,12 @@ import com.yunyou.shanhe.ticket.mapper.WaitlistOrderMapper;
 import com.yunyou.shanhe.ticket.mq.EventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -39,6 +42,9 @@ public class BookingService {
     private final WaitlistOrderMapper waitlistMapper;
     private final EventPublisher eventPublisher;
     private final TicketTypeService ticketTypeService;
+
+    @Value("${waitlist.cutoff-hour:22}")
+    private int cutoffHour;
 
     /**
      * 现货下单：先锁后付（景区锁票 → 生成待支付订单）。
@@ -263,9 +269,14 @@ public class BookingService {
     public int cutoffExpiredWaitlists() {
         List<WaitlistOrder> queuing = waitlistMapper.selectList(Wrappers.<WaitlistOrder>lambdaQuery()
                 .eq(WaitlistOrder::getStatus, WaitlistStatus.QUEUING.getCode())
-                .le(WaitlistOrder::getVisitDate, LocalDate.now()));
+                .le(WaitlistOrder::getVisitDate, LocalDate.now().plusDays(1)));
+        LocalDateTime nowTime = LocalDateTime.now();
         int cutoff = 0;
         for (WaitlistOrder w : queuing) {
+            LocalDateTime cutoffTime = LocalDateTime.of(w.getVisitDate().minusDays(1), LocalTime.of(cutoffHour, 0));
+            if (nowTime.isBefore(cutoffTime)) {
+                continue;
+            }
             try {
                 long now = System.currentTimeMillis();
                 WaitlistOrder update = new WaitlistOrder();
