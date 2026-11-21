@@ -49,6 +49,7 @@ docker build -f deploy/Dockerfile \
 kubectl apply -f deploy/k8s/configmap.yaml
 kubectl apply -f deploy/k8s/secret.yaml
 kubectl apply -f deploy/k8s/rabbitmq.yaml
+kubectl apply -f deploy/k8s/xxl-job-admin.yaml
 kubectl apply -f deploy/k8s/deployments.yaml
 
 kubectl get pods -w   # 等所有 Pod Running
