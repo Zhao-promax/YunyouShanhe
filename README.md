@@ -19,7 +19,7 @@
 | yunyou-gateway | 8080 | 路由、JWT 鉴权、限流、CORS |
 | yunyou-common | — | 统一响应/异常、MQ 常量、事件定义 |
 | yunyou-user-service | 8081 | 用户、实名、认证 |
-| yunyou-content-service | 8082 | 城市/景点/攻略、检索、推荐 |
+| yunyou-content-service | 8082 | 城市/景点/攻略、检索、AI 旅行规划 |
 | yunyou-ticket-service | 8083 | 现货购票、候补队列、退票（核心） |
 | yunyou-pay-service | 8084 | 支付、退款、资金台账 |
 | yunyou-message-service | 8085 | 通知、站内信、订阅 |
@@ -70,7 +70,7 @@ java -jar yunyou-user-service/target/yunyou-user-service-1.0.0-SNAPSHOT.jar
 
 ## 接口清单
 
-鉴权约定：C 端服务通过请求头 `X-User-Id` 传递用户身份（网关 JWT 鉴权接入后由网关注入）；用户登录接口返回 `Authorization: Bearer <token>`。
+鉴权约定：网关 JWT 校验后向下游注入 `X-User-Id`；用户登录接口返回 `Authorization: Bearer <token>`。
 
 ### 用户服务 `/api/user`
 
@@ -149,21 +149,18 @@ java -jar yunyou-user-service/target/yunyou-user-service-1.0.0-SNAPSHOT.jar
 
 - 本机若同时存在 JDK 8/11/17，构建和运行务必使用 **JDK 17**（`JAVA_HOME` 或运行命令显式指定）。
 - 开发期密钥（JWT/AES）在各服务 `application.yml` 里为占位值，上线前迁移到 Nacos 配置中心 / 阿里云 KMS。
+- AI 旅行规划需配置 DeepSeek API Key（环境变量 `YUNYOU_AI_API_KEY`），未配置时可设 `app.ai.provider=mock` 走 Mock。
 
 ## 已完成的核心能力
 
-- 网关 JWT 鉴权、消费幂等、MQ 手动 ACK + 死信队列、Sentinel 渠道 QPS 限流
+- 网关 JWT 鉴权、消费幂等、MQ 手动 ACK + 死信队列
 - 票种价格配置、候补队列 Redis↔DB 对账补偿、XXL-Job 定时任务（对账/熔断/超时关闭）
-- ES 中文检索 IK 分词器、攻略/景点多维度筛选
-- 多级缓存（Caffeine 本地 + Redis 分布式），防穿透/击穿/雪崩，读接口压测 QPS 424 → 3907（约 9 倍）
-- AI 旅行规划（RAG）：ES 检索真实景点/攻略作为上下文喂给 DeepSeek 生成行程，检索 grounding 避免幻觉，LLM 渠道接口抽象可替换
-- 支付 / 短信 / 景区渠道接口抽象（开发期 Mock，可替换为真实渠道实现）
+- 候补中签 DB 原子 CAS 抢占，防多实例并发重复出票
+- ES 中文检索（IK 分词 + 多字段检索）、攻略/景点多维度筛选
+- MySQL-ES 最终一致：本地消息表（outbox）+ MQ 增量同步 + 定时全量重建（分布式锁）
+- 资金域本地消息表（outbox）+ 失败退避重试，保证出票/退款事件不丢
+- Sentinel 渠道 QPS 限流 + 规则热更新
+- 多级缓存（Caffeine + Redis），防穿透/击穿/雪崩，读接口压测 QPS 424 → 3907（约 9 倍）
+- AI 旅行规划（RAG + SSE 流式）：LLM 抽取关键词 + ES 多字段检索 + DeepSeek 生成，检索 grounding 避免幻觉
+- 支付 / 短信 / 景区 / AI 渠道接口抽象（开发期 Mock，可替换真实实现）
 - 实名档案自动归档、核心逻辑单元测试、Dockerfile 与 K8s 部署清单、读写路径压测
-
-## 剩余 TODO（外部依赖 / 商务环节）
-
-- 微信登录、极光推送（需外部账号资质）
-- 微信 / 支付宝支付、阿里云短信真实接入（渠道接口已抽象，需商户号 / 短信模板资质）
-- Webhook 验签（需景区签名规范 / 密钥）
-- 三方对账（需真实景区订单数据）
-- 密钥上收 Nacos 配置中心 / KMS（部署时以环境变量 / K8s Secret 注入）
