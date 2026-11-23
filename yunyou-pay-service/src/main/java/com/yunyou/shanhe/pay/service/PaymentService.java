@@ -2,6 +2,7 @@ package com.yunyou.shanhe.pay.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.yunyou.shanhe.common.core.BizException;
+import com.yunyou.shanhe.pay.channel.PayChannelClient;
 import com.yunyou.shanhe.pay.dto.CreatePaymentRequest;
 import com.yunyou.shanhe.pay.dto.PaymentCallbackRequest;
 import com.yunyou.shanhe.pay.entity.FundLedger;
@@ -27,6 +28,7 @@ public class PaymentService {
     private final PaymentOrderMapper paymentMapper;
     private final RefundOrderMapper refundMapper;
     private final FundLedgerMapper ledgerMapper;
+    private final PayChannelClient payChannelClient;
 
     public PaymentOrder createPayment(Long userId, CreatePaymentRequest request) {
         long now = System.currentTimeMillis();
@@ -40,7 +42,8 @@ public class PaymentService {
         order.setCreatedAt(now);
         order.setUpdatedAt(now);
         paymentMapper.insert(order);
-        // TODO 调用微信/支付宝下单，返回支付参数
+        String prepayId = payChannelClient.placeOrder(order.getPayOrderNo(), order.getAmount(), order.getPayChannel());
+        log.info("生成支付单 payOrderNo={} prepayId={}", order.getPayOrderNo(), prepayId);
         return order;
     }
 
@@ -52,7 +55,9 @@ public class PaymentService {
         if (order.getStatus() != PaymentStatus.PENDING.getCode()) {
             throw new BizException("支付单状态不允许回调");
         }
-        // TODO 主动反查支付渠道二次核验金额与状态
+        if (!payChannelClient.queryPaid(request.transactionId())) {
+            throw new BizException("支付核验失败");
+        }
         long now = System.currentTimeMillis();
         PaymentOrder update = new PaymentOrder();
         update.setId(order.getId());
@@ -74,11 +79,14 @@ public class PaymentService {
             return;
         }
         long now = System.currentTimeMillis();
-        // TODO 调用微信/支付宝退款接口并核验，失败重试
+        Long refundAmount = amount != null && amount > 0 ? amount : order.getAmount();
+        if (!payChannelClient.refund(order.getTransactionId(), refundAmount)) {
+            throw new BizException("退款失败");
+        }
         RefundOrder refund = new RefundOrder();
         refund.setRefundNo(genNo("RF"));
         refund.setPayOrderNo(payOrderNo);
-        refund.setAmount(amount != null && amount > 0 ? amount : order.getAmount());
+        refund.setAmount(refundAmount);
         refund.setReason(reason);
         refund.setStatus(RefundStatus.SUCCESS.getCode());
         refund.setRefundedTime(now);

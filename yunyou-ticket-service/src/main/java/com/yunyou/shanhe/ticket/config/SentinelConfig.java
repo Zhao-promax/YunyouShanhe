@@ -9,6 +9,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -42,6 +43,12 @@ public class SentinelConfig {
                 .collect(Collectors.toList());
         FlowRuleManager.loadRules(rules);
         log.info("Sentinel 限流规则加载完成，共 {} 条", rules.size());
+    }
+
+    /** 每分钟热更新：渠道 QPS 配置变更后自动生效，无需重启。 */
+    @Scheduled(fixedDelay = 60000, initialDelay = 30000)
+    public void hotReloadRules() {
+        reloadRules();
     }
 
     public static String resourceName(Long channelId) {

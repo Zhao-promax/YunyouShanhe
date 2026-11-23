@@ -7,16 +7,16 @@
 ## 技术栈
 
 - Java 17、Spring Boot 3.2.x、Spring Cloud 2023.0.x、Spring Cloud Alibaba 2023.0.x
-- Nacos（注册发现）、Spring Cloud Gateway、OpenFeign、Sentinel（预留）
+- Nacos（注册发现）、Spring Cloud Gateway、OpenFeign、Sentinel（渠道 QPS 限流）
 - RabbitMQ（异步事件）、Redis（缓存 / 候补队列）、MySQL 8（每服务独立库）、Elasticsearch 8（检索）
-- MyBatis-Plus、XXL-Job（预留）、JWT、BCrypt、AES-GCM
-- 阿里云 OSS / 短信 / SLS（生产，当前开发期为 Mock）
+- MyBatis-Plus、XXL-Job（对账/熔断/超时关闭）、JWT、BCrypt、AES-GCM
+- DeepSeek（LLM / RAG 旅行规划）、阿里云 OSS / 短信 / SLS（生产，当前开发期为 Mock）
 
 ## 模块结构
 
 | 模块 | 端口 | 职责 |
 |---|---|---|
-| yunyou-gateway | 8080 | 路由、限流、CORS、鉴权（占位） |
+| yunyou-gateway | 8080 | 路由、JWT 鉴权、限流、CORS |
 | yunyou-common | — | 统一响应/异常、MQ 常量、事件定义 |
 | yunyou-user-service | 8081 | 用户、实名、认证 |
 | yunyou-content-service | 8082 | 城市/景点/攻略、检索、推荐 |
@@ -102,6 +102,8 @@ java -jar yunyou-user-service/target/yunyou-user-service-1.0.0-SNAPSHOT.jar
 | POST | /guide | 新增/更新攻略 |
 | GET | /search/scenic | ES 景点检索 |
 | GET | /search/guide | ES 攻略检索 |
+| POST | /ai/plan | AI 旅行规划（RAG，DeepSeek） |
+| POST | /ai/plan/stream | AI 旅行规划（SSE 流式输出） |
 
 ### 票务服务 `/api/ticket`
 
@@ -153,11 +155,15 @@ java -jar yunyou-user-service/target/yunyou-user-service-1.0.0-SNAPSHOT.jar
 - 网关 JWT 鉴权、消费幂等、MQ 手动 ACK + 死信队列、Sentinel 渠道 QPS 限流
 - 票种价格配置、候补队列 Redis↔DB 对账补偿、XXL-Job 定时任务（对账/熔断/超时关闭）
 - ES 中文检索 IK 分词器、攻略/景点多维度筛选
-- 实名档案自动归档、单元测试、Dockerfile 与 K8s 部署清单
+- 多级缓存（Caffeine 本地 + Redis 分布式），防穿透/击穿/雪崩，读接口压测 QPS 424 → 3907（约 9 倍）
+- AI 旅行规划（RAG）：ES 检索真实景点/攻略作为上下文喂给 DeepSeek 生成行程，检索 grounding 避免幻觉，LLM 渠道接口抽象可替换
+- 支付 / 短信 / 景区渠道接口抽象（开发期 Mock，可替换为真实渠道实现）
+- 实名档案自动归档、核心逻辑单元测试、Dockerfile 与 K8s 部署清单、读写路径压测
 
 ## 剩余 TODO（外部依赖 / 商务环节）
 
-- 微信登录、阿里云短信、极光推送（需外部账号资质）
+- 微信登录、极光推送（需外部账号资质）
+- 微信 / 支付宝支付、阿里云短信真实接入（渠道接口已抽象，需商户号 / 短信模板资质）
 - Webhook 验签（需景区签名规范 / 密钥）
 - 三方对账（需真实景区订单数据）
 - 密钥上收 Nacos 配置中心 / KMS（部署时以环境变量 / K8s Secret 注入）

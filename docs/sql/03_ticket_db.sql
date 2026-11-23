@@ -113,3 +113,20 @@ CREATE TABLE IF NOT EXISTS `ticket_type` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_scenic_type` (`scenic_id`, `type_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='票种价格';
+
+-- 本地消息表（outbox）：与业务写同事务落库，异步投递 MQ，失败退避重试
+CREATE TABLE IF NOT EXISTS `outbox_message` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `event_id` VARCHAR(64) NOT NULL COMMENT '事件唯一ID（幂等键）',
+  `event_type` VARCHAR(64) NOT NULL COMMENT '事件类型',
+  `payload` TEXT NOT NULL COMMENT '事件内容 JSON',
+  `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态：0待发送 1已发送 2发送失败',
+  `retry_count` TINYINT NOT NULL DEFAULT 0 COMMENT '已重试次数',
+  `next_retry_at` BIGINT NOT NULL DEFAULT 0 COMMENT '下次重试时间戳（毫秒），0=立即可发',
+  `error_msg` VARCHAR(512) DEFAULT NULL COMMENT '最后一次发送失败原因',
+  `created_at` BIGINT NOT NULL COMMENT '创建时间',
+  `sent_at` BIGINT DEFAULT NULL COMMENT '发送时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_event_id` (`event_id`),
+  KEY `idx_status_created` (`status`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='本地消息表';

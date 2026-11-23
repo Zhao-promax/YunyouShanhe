@@ -21,4 +21,9 @@ public final class MqConstants {
     public static final String DEAD_LETTER_EXCHANGE = "yunyou.dlx";
     public static final String REFUND_DLQ = "yunyou.pay.refund.dlq";
     public static final String NOTIFY_DLQ = "yunyou.message.notify.dlq";
+
+    public static final String CONTENT_EXCHANGE = "yunyou.content.topic";
+    public static final String ROUTING_CONTENT_CHANGED = "content.changed";
+    public static final String CONTENT_SYNC_QUEUE = "yunyou.content.sync.queue";
+    public static final String CONTENT_SYNC_DLQ = "yunyou.content.sync.dlq";
 }

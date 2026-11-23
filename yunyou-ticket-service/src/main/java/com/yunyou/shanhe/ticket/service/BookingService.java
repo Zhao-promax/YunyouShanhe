@@ -1,5 +1,6 @@
 package com.yunyou.shanhe.ticket.service;
 
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.yunyou.shanhe.common.core.BizException;
 import com.yunyou.shanhe.common.event.NotifyEvent;
@@ -21,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -85,6 +87,7 @@ public class BookingService {
     /**
      * 现货支付确认（开发期 Mock；生产由支付服务回调触发）。待支付 → 已出票。
      */
+    @Transactional
     public void confirmPayment(String orderNo) {
         TicketOrder order = orderService.getByOrderNo(orderNo);
         if (order == null) {
@@ -95,15 +98,16 @@ public class BookingService {
         }
         orderService.updateStatus(orderNo, OrderStatus.PENDING_PAY.getCode(), OrderStatus.ISSUED.getCode(),
                 "支付成功", "pay");
-        eventPublisher.publishIssued(new TicketIssuedEvent(orderNo, order.getUserId(), order.getScenicId(), order.getAmount()));
-        eventPublisher.publishOrderChanged(new OrderChangedEvent(orderNo, OrderStatus.PENDING_PAY.getCode(),
+        eventPublisher.record("TICKET_ISSUED", new TicketIssuedEvent(orderNo, order.getUserId(), order.getScenicId(), order.getAmount()));
+        eventPublisher.record("ORDER_CHANGED", new OrderChangedEvent(orderNo, OrderStatus.PENDING_PAY.getCode(),
                 OrderStatus.ISSUED.getCode(), "支付成功"));
-        eventPublisher.publishNotify(new NotifyEvent(order.getUserId(), "ticket_issued", "预约成功"));
+        eventPublisher.record("NOTIFY", new NotifyEvent(order.getUserId(), "ticket_issued", "预约成功"));
     }
 
     /**
      * 退票：已出票 → 已退票，释放库存由景区 Webhook 流入候补队列。
      */
+    @Transactional
     public void refundTicket(Long userId, String orderNo) {
         TicketOrder order = orderService.getByOrderNo(orderNo);
         if (order == null || !order.getUserId().equals(userId)) {
@@ -118,13 +122,14 @@ public class BookingService {
 
         orderService.updateStatus(orderNo, OrderStatus.ISSUED.getCode(), OrderStatus.REFUNDED.getCode(),
                 "用户退票", "user");
-        eventPublisher.publishRefund(new RefundEvent(orderNo, order.getPayOrderNo(), userId, order.getAmount(), "用户退票"));
-        eventPublisher.publishNotify(new NotifyEvent(userId, "ticket_refunded", "退票成功"));
+        eventPublisher.record("REFUND", new RefundEvent(orderNo, order.getPayOrderNo(), userId, order.getAmount(), "用户退票"));
+        eventPublisher.record("NOTIFY", new NotifyEvent(userId, "ticket_refunded", "退票成功"));
     }
 
     /**
      * 现货订单超时关闭（供定时任务调用）。
      */
+    @Transactional
     public void closeExpiredOrder(String orderNo) {
         TicketOrder order = orderService.getByOrderNo(orderNo);
         if (order == null || order.getStatus() != OrderStatus.PENDING_PAY.getCode()) {
@@ -137,7 +142,7 @@ public class BookingService {
         channelService.releaseTicketWithLog(channel, order.getRequestId());
         orderService.updateStatus(orderNo, OrderStatus.PENDING_PAY.getCode(), OrderStatus.CLOSED.getCode(),
                 "支付超时关闭", "system");
-        eventPublisher.publishOrderChanged(new OrderChangedEvent(orderNo, OrderStatus.PENDING_PAY.getCode(),
+        eventPublisher.record("ORDER_CHANGED", new OrderChangedEvent(orderNo, OrderStatus.PENDING_PAY.getCode(),
                 OrderStatus.CLOSED.getCode(), "支付超时关闭"));
     }
 
@@ -168,15 +173,22 @@ public class BookingService {
     /**
      * 候补消费：库存释放 K 个名额，取队首 K 条依次尝试预约。
      */
+    @Transactional
     public int consumeWaitlist(Long scenicId, LocalDate visitDate, String slot, int k) {
         List<Long> ids = waitlistService.popTop(scenicId, visitDate, slot, k);
         int issued = 0;
         for (Long waitlistId : ids) {
-            WaitlistOrder w = waitlistMapper.selectById(waitlistId);
-            if (w == null || w.getStatus() != WaitlistStatus.QUEUING.getCode()) {
+            // 原子抢占：仅当仍是「排队中」才置为「已中签」，防止多实例并发重复出票
+            int claimed = waitlistMapper.update(null, new UpdateWrapper<WaitlistOrder>()
+                    .eq("id", waitlistId)
+                    .eq("status", WaitlistStatus.QUEUING.getCode())
+                    .set("status", WaitlistStatus.WON.getCode())
+                    .set("updated_at", System.currentTimeMillis()));
+            if (claimed == 0) {
                 waitlistService.remove(scenicId, visitDate, slot, waitlistId);
                 continue;
             }
+            WaitlistOrder w = waitlistMapper.selectById(waitlistId);
             Channel channel = channelService.getByScenicId(scenicId);
             String requestId = UUID.randomUUID().toString().replace("-", "");
             ChannelLockResult lockResult = channelService.lockTicketWithLog(channel, new ChannelLockRequest(
@@ -186,7 +198,12 @@ public class BookingService {
                 waitlistService.remove(scenicId, visitDate, slot, waitlistId);
                 issued++;
             } else {
-                // 临时失败（名额被抢占）：保留队首继续等待下一批名额
+                // 临时失败（名额被抢占）：回滚抢占，保留队首继续等待
+                WaitlistOrder revert = new WaitlistOrder();
+                revert.setId(waitlistId);
+                revert.setStatus(WaitlistStatus.QUEUING.getCode());
+                revert.setUpdatedAt(System.currentTimeMillis());
+                waitlistMapper.updateById(revert);
                 log.info("候补临时失败，保留队首 waitlistNo={}", w.getWaitlistNo());
             }
         }
@@ -196,6 +213,7 @@ public class BookingService {
     /**
      * 取消候补：出队 + 状态更新 + 触发退款事件。
      */
+    @Transactional
     public void cancelWaitlist(Long userId, String waitlistNo) {
         WaitlistOrder w = waitlistMapper.selectOne(
                 Wrappers.<WaitlistOrder>lambdaQuery().eq(WaitlistOrder::getWaitlistNo, waitlistNo));
@@ -213,13 +231,14 @@ public class BookingService {
         waitlistMapper.updateById(update);
         waitlistService.remove(w.getScenicId(), w.getVisitDate(), w.getPreferredSlot(), w.getId());
 
-        eventPublisher.publishRefund(new RefundEvent(w.getWaitlistNo(), w.getPayOrderNo(), userId, 0L, "用户取消候补"));
-        eventPublisher.publishNotify(new NotifyEvent(userId, "waitlist_cancelled", "候补已取消"));
+        eventPublisher.record("REFUND", new RefundEvent(w.getWaitlistNo(), w.getPayOrderNo(), userId, 0L, "用户取消候补"));
+        eventPublisher.record("NOTIFY", new NotifyEvent(userId, "waitlist_cancelled", "候补已取消"));
     }
 
     /**
      * 候补熔断：截止时间未中签的候补批量终止并退款（供定时任务调用）。
      */
+    @Transactional
     public int cutoffWaitlists(Long scenicId, LocalDate visitDate, String slot) {
         List<WaitlistOrder> queuing = waitlistMapper.selectList(Wrappers.<WaitlistOrder>lambdaQuery()
                 .eq(WaitlistOrder::getScenicId, scenicId)
@@ -235,8 +254,8 @@ public class BookingService {
             waitlistMapper.updateById(update);
             waitlistService.remove(scenicId, visitDate, slot, w.getId());
 
-            eventPublisher.publishRefund(new RefundEvent(w.getWaitlistNo(), w.getPayOrderNo(), w.getUserId(), 0L, "候补熔断截止"));
-            eventPublisher.publishNotify(new NotifyEvent(w.getUserId(), "waitlist_failed", "候补未中签，已退款"));
+            eventPublisher.record("REFUND", new RefundEvent(w.getWaitlistNo(), w.getPayOrderNo(), w.getUserId(), 0L, "候补熔断截止"));
+            eventPublisher.record("NOTIFY", new NotifyEvent(w.getUserId(), "waitlist_failed", "候补未中签，已退款"));
         }
         return queuing.size();
     }
@@ -244,6 +263,7 @@ public class BookingService {
     /**
      * 批量关闭支付超时的现货订单（定时任务）。
      */
+    @Transactional
     public int closeExpiredOrders() {
         List<TicketOrder> expired = orderService.listExpiredPendingPay();
         int closed = 0;
@@ -253,7 +273,7 @@ public class BookingService {
                 channelService.releaseTicketWithLog(channel, order.getRequestId());
                 orderService.updateStatus(order.getOrderNo(), OrderStatus.PENDING_PAY.getCode(),
                         OrderStatus.CLOSED.getCode(), "支付超时关闭", "system");
-                eventPublisher.publishOrderChanged(new OrderChangedEvent(order.getOrderNo(),
+                eventPublisher.record("ORDER_CHANGED", new OrderChangedEvent(order.getOrderNo(),
                         OrderStatus.PENDING_PAY.getCode(), OrderStatus.CLOSED.getCode(), "支付超时关闭"));
                 closed++;
             } catch (Exception e) {
@@ -266,6 +286,7 @@ public class BookingService {
     /**
      * 批量熔断已到截止时间的候补单（定时任务）。
      */
+    @Transactional
     public int cutoffExpiredWaitlists() {
         List<WaitlistOrder> queuing = waitlistMapper.selectList(Wrappers.<WaitlistOrder>lambdaQuery()
                 .eq(WaitlistOrder::getStatus, WaitlistStatus.QUEUING.getCode())
@@ -285,8 +306,8 @@ public class BookingService {
                 update.setUpdatedAt(now);
                 waitlistMapper.updateById(update);
                 waitlistService.remove(w.getScenicId(), w.getVisitDate(), w.getPreferredSlot(), w.getId());
-                eventPublisher.publishRefund(new RefundEvent(w.getWaitlistNo(), w.getPayOrderNo(), w.getUserId(), 0L, "候补熔断截止"));
-                eventPublisher.publishNotify(new NotifyEvent(w.getUserId(), "waitlist_failed", "候补未中签，已退款"));
+                eventPublisher.record("REFUND", new RefundEvent(w.getWaitlistNo(), w.getPayOrderNo(), w.getUserId(), 0L, "候补熔断截止"));
+                eventPublisher.record("NOTIFY", new NotifyEvent(w.getUserId(), "waitlist_failed", "候补未中签，已退款"));
                 cutoff++;
             } catch (Exception e) {
                 log.error("候补熔断失败 waitlistNo={}", w.getWaitlistNo(), e);
@@ -314,15 +335,15 @@ public class BookingService {
         order.setUpdatedAt(now);
         orderService.create(order);
 
+        // 状态已由 consumeWaitlist 原子抢占为「已中签」，此处仅回填订单ID
         WaitlistOrder update = new WaitlistOrder();
         update.setId(w.getId());
-        update.setStatus(WaitlistStatus.WON.getCode());
         update.setOrderId(order.getId());
         update.setUpdatedAt(now);
         waitlistMapper.updateById(update);
 
-        eventPublisher.publishIssued(new TicketIssuedEvent(order.getOrderNo(), w.getUserId(), w.getScenicId(), order.getAmount()));
-        eventPublisher.publishNotify(new NotifyEvent(w.getUserId(), "waitlist_won", "候补中签成功"));
+        eventPublisher.record("TICKET_ISSUED", new TicketIssuedEvent(order.getOrderNo(), w.getUserId(), w.getScenicId(), order.getAmount()));
+        eventPublisher.record("NOTIFY", new NotifyEvent(w.getUserId(), "waitlist_won", "候补中签成功"));
     }
 
     private String genNo(String prefix) {

@@ -13,13 +13,40 @@ spring:
     url: jdbc:mysql://192.168.179.248:3306/content_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: root
     password: root
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 30000
+      max-lifetime: 1800000
+      idle-timeout: 600000
   elasticsearch:
     uris: http://192.168.179.248:9200
+  data:
+    redis:
+      host: 192.168.179.248
+      port: 6379
+      database: 0
+  rabbitmq:
+    host: 192.168.179.248
+    port: 5672
+    username: admin
+    password: admin
+    listener:
+      simple:
+        acknowledge-mode: manual
+
+app:
+  cache:
+    enabled: true
+  ai:
+    provider: deepseek
+    base-url: https://api.deepseek.com
+    model: deepseek-v4-pro
+    api-key: ${YUNYOU_AI_API_KEY:}
 
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 management:
   endpoints:

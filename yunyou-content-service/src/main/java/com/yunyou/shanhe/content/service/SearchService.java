@@ -39,7 +39,7 @@ public class SearchService {
         if (minRating != null) {
             filters.add("{\"range\":{\"rating\":{\"gte\":" + minRating + "}}}");
         }
-        String json = "{\"bool\":{\"must\":[{\"match\":{\"name\":\"" + escape(keyword) + "\"}}]"
+        String json = "{\"bool\":{\"must\":[{\"multi_match\":{\"query\":\"" + escape(keyword) + "\",\"fields\":[\"name\",\"intro\",\"tags\"]}}]"
                 + (filters.isEmpty() ? "" : ",\"filter\":[" + String.join(",", filters) + "]")
                 + "}}";
         SearchHits<ScenicDocument> hits = elasticsearchOperations.search(
@@ -62,7 +62,7 @@ public class SearchService {
         if (guideType != null) {
             filters.add("{\"term\":{\"guideType\":" + guideType + "}}");
         }
-        String json = "{\"bool\":{\"must\":[{\"match\":{\"title\":\"" + escape(keyword) + "\"}}]"
+        String json = "{\"bool\":{\"must\":[{\"multi_match\":{\"query\":\"" + escape(keyword) + "\",\"fields\":[\"title\",\"summary\",\"tags\"]}}]"
                 + (filters.isEmpty() ? "" : ",\"filter\":[" + String.join(",", filters) + "]")
                 + "}}";
         SearchHits<GuideDocument> hits = elasticsearchOperations.search(

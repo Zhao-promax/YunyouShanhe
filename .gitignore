@@ -39,3 +39,6 @@ es/*.zip
 
 # K8s 真实密钥（不提交）
 deploy/k8s/secret.yaml
+
+# api
+api.md

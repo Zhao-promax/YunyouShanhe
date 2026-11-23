@@ -1,30 +1,45 @@
 package com.yunyou.shanhe.content.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.yunyou.shanhe.content.entity.City;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yunyou.shanhe.content.cache.MultiLevelCache;
 import com.yunyou.shanhe.content.entity.Scenic;
-import com.yunyou.shanhe.content.es.ScenicDocument;
-import com.yunyou.shanhe.content.mapper.CityMapper;
 import com.yunyou.shanhe.content.mapper.ScenicMapper;
+import com.yunyou.shanhe.content.mq.ContentEventPublisher;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
 
 /**
- * 景点服务：多维度筛选 + CRUD + ES 索引同步 + 同片区顺路推荐。
+ * 景点服务：多维度筛选 + CRUD + 同片区顺路推荐。
+ * <p>
+ * 读路径走多级缓存；写路径写 MySQL + outbox（同事务），异步同步 ES。
  */
 @Service
 @RequiredArgsConstructor
 public class ScenicService {
 
+    private static final String KEY_PREFIX = "scenic:";
+    private static final Duration TTL = Duration.ofMinutes(5);
+
     private final ScenicMapper scenicMapper;
-    private final CityMapper cityMapper;
-    private final ElasticsearchOperations elasticsearchOperations;
+    private final MultiLevelCache cache;
+    private final ObjectMapper objectMapper;
+    private final ContentEventPublisher contentEventPublisher;
 
     public List<Scenic> list(Long cityId, String category, String season, Integer budgetLevel, Double minRating) {
+        String key = KEY_PREFIX + "list:" + nvl(cityId) + ":" + nvl(category) + ":" + nvl(season)
+                + ":" + nvl(budgetLevel) + ":" + nvl(minRating);
+        return cache.getOrLoad(key, listType(), TTL,
+                () -> queryList(cityId, category, season, budgetLevel, minRating));
+    }
+
+    private List<Scenic> queryList(Long cityId, String category, String season, Integer budgetLevel, Double minRating) {
         return scenicMapper.selectList(Wrappers.<Scenic>lambdaQuery()
                 .eq(cityId != null, Scenic::getCityId, cityId)
                 .eq(category != null && !category.isBlank(), Scenic::getCategory, category)
@@ -36,9 +51,14 @@ public class ScenicService {
     }
 
     public Scenic getById(Long id) {
-        return scenicMapper.selectById(id);
+        if (id == null) {
+            return null;
+        }
+        return cache.getOrLoad(KEY_PREFIX + "detail:" + id, objectMapper.constructType(Scenic.class), TTL,
+                () -> scenicMapper.selectById(id));
     }
 
+    @Transactional
     public Scenic save(Scenic scenic) {
         long now = System.currentTimeMillis();
         if (scenic.getId() == null) {
@@ -49,7 +69,10 @@ public class ScenicService {
             scenic.setUpdatedAt(now);
             scenicMapper.updateById(scenic);
         }
-        indexToEs(scenic);
+        // 异步同步 ES：落 outbox（与业务写同事务），由定时任务投递 MQ → 消费端索引
+        contentEventPublisher.record("SCENIC", scenic.getId());
+        // 写后主动失效，避免读旧数据
+        cache.evictByPrefix(KEY_PREFIX);
         return scenic;
     }
 
@@ -57,6 +80,14 @@ public class ScenicService {
      * 同片区顺路推荐：同城市内按地理距离升序。
      */
     public List<Scenic> nearby(Long scenicId, int limit) {
+        if (scenicId == null) {
+            return List.of();
+        }
+        String key = KEY_PREFIX + "nearby:" + scenicId + ":" + limit;
+        return cache.getOrLoad(key, listType(), TTL, () -> queryNearby(scenicId, limit));
+    }
+
+    private List<Scenic> queryNearby(Long scenicId, int limit) {
         Scenic target = scenicMapper.selectById(scenicId);
         if (target == null) {
             return List.of();
@@ -71,10 +102,12 @@ public class ScenicService {
                 .toList();
     }
 
-    private void indexToEs(Scenic scenic) {
-        City city = cityMapper.selectById(scenic.getCityId());
-        String cityName = city != null ? city.getName() : "";
-        elasticsearchOperations.save(ScenicDocument.from(scenic, cityName));
+    private JavaType listType() {
+        return objectMapper.getTypeFactory().constructCollectionType(List.class, Scenic.class);
+    }
+
+    private String nvl(Object o) {
+        return o == null ? "" : String.valueOf(o);
     }
 
     private double distance(Scenic a, Scenic b) {
